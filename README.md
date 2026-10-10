@@ -4,6 +4,7 @@
 [![WebGPU](https://img.shields.io/badge/🤗%20WebGPU-in%20your%20browser-orange)](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-webgpu)
 [![Model](https://img.shields.io/badge/🤗%20Model-Vyvo%2Fdrifting--tts--tr-blue)](https://huggingface.co/Vyvo/drifting-tts-tr)
 [![Paper](https://img.shields.io/badge/arXiv-2602.04770-b31b1b)](https://arxiv.org/abs/2602.04770)
+[![Fast](https://img.shields.io/badge/GitHub-fast--tr--drifting-black)](https://github.com/kadirnar/fast-tr-drifting)
 
 A Turkish TTS model that turns text into speech with **a single network pass**, with no diffusion or flow steps.
 It is trained with *[Generative Modeling via Drifting](https://arxiv.org/abs/2602.04770)* (Deng et al., 2026), using
@@ -13,7 +14,7 @@ the learned-temperature recipe from [Kyutai's Pocket TTS](https://kyutai.org/blo
 |---|---|
 | **Quality** | [Freya-TR-Eval](https://huggingface.co/datasets/freyavoice/freya-tr-eval) WER **1.33%** (v3.2, studio voice; v3.1 1.23%; Piper 3.76%, MMS-TTS 6.26% under the same protocol) · UTMOSv2 **3.02** (v3.1 2.94) |
 | **Intonation** (v3.2) | the pitch is **sampled** by a small model trained with drifting: pitch spread 3.53 semitones on held-out sentences (recordings 3.68, v3.1 3.21) |
-| **Speed** (RTX 5090) | first audio after **6–7 ms** for any sentence length (v3.2, streaming, CUDA graphs; v3.1: 12–14 ms), 200–600× faster than real time |
+| **Speed** (RTX 5090) | first audio after **6–7 ms** for any sentence length (v3.2, streaming, CUDA graphs; v3.1: 12–14 ms), 200–600× faster than real time; **256 requests at once: first audio after 52 ms** (streaming DiT, batched, [docs/LATENCY.md](docs/LATENCY.md)) |
 | **Size** | 67.7 M acoustic model + 8.1 M prosody model + 13.5 M Vocos vocoder (v3.1: 67.7 M + 112 M BigVGAN-v2) |
 | **Voices** | `studio` (default), `male` and `female` |
 
@@ -104,6 +105,11 @@ for piece in tts.stream("Merhaba! Bu ses parça parça, bekletmeden geliyor.", s
                         cfg_scale=2.0, temperature=0.3):
     play(piece)   # float32 tensor at 24 kHz
 ```
+
+**Serving many users: [fast-tr-drifting](https://github.com/kadirnar/fast-tr-drifting).** A lean, separate package
+of this model for fast inference and serving: the streaming DiT, batched serving (`Serving.fast()`, Triton noise
+kernel), a streaming server example with dynamic micro-batching, benchmarks, and the training code to reproduce v3.2.
+Its outputs match this repository bit for bit on every deterministic path.
 
 ## In the browser (WebGPU)
 
@@ -227,6 +233,7 @@ be added later by fine-tuning ([docs/TRAINING.md](docs/TRAINING.md#adding-a-voic
 |---|---|
 | [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | **experiment log**: every experiment since v3.1, what worked and what did not, pitfalls, open work |
 | [docs/RESULTS.md](docs/RESULTS.md) | benchmark details, voices, latency and parameter counts |
+| [fast-tr-drifting](https://github.com/kadirnar/fast-tr-drifting) | separate repository: fast inference and serving package of v3.2 (streaming, batched, server example) with the training code |
 | [docs/LATENCY.md](docs/LATENCY.md) | time to first audio of v3.2: one request, and 64 / 128 / 256 requests at once (one by one, batched, micro-batched) |
 | [docs/SPEAKERS.md](docs/SPEAKERS.md) | WER, CER, DNSMOS, UTMOSv2, pitch and speaking rate of all 723 speaker IDs |
 | [docs/VOCODERS.md](docs/VOCODERS.md) | the vocoder registry and a comparison on the same mels: quality, speed, streaming |
