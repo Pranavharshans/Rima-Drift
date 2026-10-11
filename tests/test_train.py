@@ -350,3 +350,11 @@ def test_grow_speakers_keeps_old_voices_and_adds_new_rows():
     for name in ("encoder.spk.weight", "generator.spk.weight"):
         w_old, w_new = old.state_dict()[name], new.state_dict()[name]
         assert torch.equal(w_new[:3], w_old) and torch.allclose(w_new[3], w_old.mean(0))
+
+
+def test_feature_keys_include_delta_features_when_enabled():
+    cfg = load_config("configs/tts_latent.yaml", ["drift.delta.stride=4", "drift.delta.raw_patch=4"])
+    mae = MelMAE(n_mels=64, base_channels=8)
+    keys = feature_keys(mae, cfg, "cpu")
+    assert {"delta_std", "delta_std8", "delta_patch4"} <= set(keys)
+    assert not any(k.startswith("delta") for k in feature_keys(mae, load_config("configs/tts_latent.yaml"), "cpu"))

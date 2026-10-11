@@ -81,6 +81,30 @@ def mel_features(mel: Tensor, mel_patch: int = 4, detail: bool = False) -> dict[
     return out
 
 
+def delta_features(x: Tensor, stride: int = 1, windows: tuple[int, ...] = (8,), raw_patch: int = 0
+                   ) -> dict[str, Tensor]:
+    """Frame-to-frame change features (``drift.delta``, #27): what the VAE decoders need and over-smooth generated
+    latents lack. Every ``stride`` frames (the copies of one VAE frame, ``extract-latents --repeat``) are averaged
+    back to one frame; ``d`` are the first differences of those frames. Maps (``[B, L, D]``): ``delta_std`` (the
+    per-channel std of ``d`` over the window), ``delta_std<k>`` (the same over windows of ``k`` frames) and, with
+    ``raw_patch``, ``delta_patch<k>`` (the raw changes, ``raw_patch`` frames per location)."""
+    B, C, T = x.shape
+    n = T // stride
+    f = x[..., : n * stride].reshape(B, C, n, stride).mean(-1)
+    d = f[..., 1:] - f[..., :-1]  # [B, C, n - 1]
+    out = {"delta_std": _std(d, -1)[:, None]}
+    for k in windows:
+        m = d.shape[-1] // k
+        if m >= 1:
+            out[f"delta_std{k}"] = _std(d[..., : m * k].reshape(B, C, m, k), -1).transpose(1, 2)
+    if raw_patch:
+        m = d.shape[-1] // raw_patch
+        if m >= 1:
+            out[f"delta_patch{raw_patch}"] = d[..., : m * raw_patch].reshape(B, C, m, raw_patch).permute(
+                0, 2, 1, 3).reshape(B, m, C * raw_patch)
+    return out
+
+
 class MelMAE(nn.Module):
     def __init__(
         self,

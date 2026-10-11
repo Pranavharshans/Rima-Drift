@@ -35,6 +35,7 @@ from .config import Config, load_config, save_config
 from .data import BucketBatchSampler, MelDataset, collate
 from .drift import feature_drift_loss
 from .latents import VAE_BACKENDS
+from .models.mae import delta_features
 from .models.text_encoder import align, duration_loss, expand, prior_loss, token_pitch
 from .models.tts import DriftingTTS
 from .slm import audio_segments, needs_audio, slm_enabled
@@ -107,6 +108,17 @@ def activation_kwargs(cfg: Config) -> dict:
     dc = cfg.drift
     return dict(patch_sizes=tuple(dc.patch_sizes), every_k_block=dc.every_k_block, mel_patch=dc.mel_patch,
                 spectral_detail=bool(dc.get("spectral_detail", False)))
+
+
+def drift_features(mae, x: torch.Tensor, cfg: Config, act: dict | None = None) -> dict:
+    """The kernel features of ``x`` ``[B, C, T]``: the frozen MAE's (:func:`activation_kwargs`) plus, with
+    ``drift.delta.stride`` > 0, the frame-to-frame change features of :func:`delta_features`."""
+    feats = mae.get_activations(x, **(activation_kwargs(cfg) if act is None else act))
+    dl = cfg.drift.get("delta") or {}
+    if dl.get("stride", 0):
+        feats.update(delta_features(x.float(), int(dl.stride), tuple(dl.get("windows", (8,))),
+                                    int(dl.get("raw_patch", 0))))
+    return feats
 
 
 def split_features(feats: dict, B: int, S: int) -> dict:
@@ -205,9 +217,9 @@ def training_step(
     feat_amp = torch.autocast("cuda", dtype=torch.bfloat16, enabled=y.is_cuda and dc.get("feature_dtype") != "fp32")
     with feat_amp:
         with torch.no_grad():
-            f_pos = split_features(mae.get_activations(pos.flatten(0, 1), **act), B, P)
-            f_unc = split_features(mae.get_activations(unc, **act), B, N)
-        f_gen = split_features(mae.get_activations(x, **act), B, G)
+            f_pos = split_features(drift_features(mae, pos.flatten(0, 1), cfg, act), B, P)
+            f_unc = split_features(drift_features(mae, unc, cfg, act), B, N)
+        f_gen = split_features(drift_features(mae, x, cfg, act), B, G)
     tau_arg = taus["tau"] if taus is not None and "tau" in taus else taus  # "tau": one global temperature (Kyutai)
     l_drift, info = feature_drift_loss(f_gen, f_pos, f_unc, weight_neg=w_unc, temperatures=tuple(dc.temperatures),
                                        key_weights=dc.get("key_weights"), affinity_floor=dc.affinity_floor,
@@ -255,7 +267,7 @@ def dataset_stats(ds: MelDataset) -> dict:
 def feature_keys(mae, cfg: Config, device) -> list[str]:
     with torch.no_grad():
         mel = torch.zeros(1, mae.n_mels, cfg.drift.crop_frames, device=device)
-        return list(mae.get_activations(mel, **activation_kwargs(cfg)))
+        return list(drift_features(mae, mel, cfg))
 
 
 def _scalar_params(keys, init: float, device) -> torch.nn.ParameterDict:
