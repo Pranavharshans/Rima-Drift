@@ -25,7 +25,7 @@ import torch
 from torch import Tensor
 
 from .alignment import sequence_mask
-from .models.prosody_net import boundary_tokens, edge_tokens
+from .models.prosody_net import boundary_tokens, edge_tokens, pause_durations
 from .models.text_encoder import durations_to_alignment, frames_to_alignment
 
 
@@ -77,7 +77,8 @@ def graphable(prosody, spread: float = 1.0) -> bool:
 class GraphedAcoustic:
     """:meth:`DriftingTTS.synthesize` (one step, one utterance) as bucketed CUDA graphs, with the same random draws.
 
-    ``prosody``: a stochastic prosody predictor (:func:`graphable`) whose durations (``prosody_durations="sampled"``)
+    ``prosody``: a stochastic prosody predictor (:func:`graphable`) whose durations (``prosody_durations="sampled"``;
+    ``"pauses"``: those of the tokens between words, the letters keeping the regressors')
     and token pitch replace the regressors', as ``ProsodyPredictor.predict`` followed by ``synthesize``.
     ``duration_row``: the sampled durations get their own row in the predictor's batch (a duration temperature of
     their own, another speaker's rhythm: ``ProsodyPredictor.sample``); every call then runs both rows."""
@@ -186,13 +187,15 @@ class GraphedAcoustic:
     def __call__(self, ids: Tensor, spk: Tensor, cfg_scale: float, temperature: float, length_scale: float,
                  generator: torch.Generator | None = None, prosody_temperature: float = 1.0,
                  duration_temperature: float | None = None, rhythm: Tensor | None = None,
-                 edge_scale: float | None = None) -> Tensor:
+                 edge_scale: float | None = None, regressor_scale: float | None = None) -> Tensor:
         """Token ids ``[1, N]`` -> normalised mel ``[1, n_mels, T]``, as ``synthesize`` with ``steps=1`` (with a
         prosody predictor: as ``ProsodyPredictor.predict`` at ``prosody_temperature`` / ``duration_temperature``,
         for the rhythm of speaker ``rhythm`` with the voice's regressor durations at ``edge_scale`` on the sentence's
-        edges, then ``synthesize``). The last three need ``duration_row``."""
+        edges, then ``synthesize``). The last three need ``duration_row``. ``regressor_scale``: the letters' scale
+        with ``prosody_durations="pauses"`` (default ``length_scale``, which then scales the sampled pauses)."""
         z, cond, alpha, labels = self.prepare(ids, spk, cfg_scale, temperature, length_scale, generator,
-                                              prosody_temperature, duration_temperature, rhythm, edge_scale)
+                                              prosody_temperature, duration_temperature, rhythm, edge_scale,
+                                              regressor_scale=regressor_scale)
         return self.generate_window(z, cond, spk, alpha, None, labels)
 
     @torch.no_grad()
@@ -214,8 +217,8 @@ class GraphedAcoustic:
     def prepare(self, ids: Tensor, spk: Tensor, cfg_scale: float, temperature: float, length_scale: float,
                 generator: torch.Generator | None = None, prosody_temperature: float = 1.0,
                 duration_temperature: float | None = None, rhythm: Tensor | None = None,
-                edge_scale: float | None = None,
-                prosody_noise: tuple[Tensor, Tensor] | None = None) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+                edge_scale: float | None = None, prosody_noise: tuple[Tensor, Tensor] | None = None,
+                regressor_scale: float | None = None) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """The DiT's inputs of :meth:`__call__` (the encoder's graph, the alignment and the draws): the noise scaled
         by ``temperature`` ``[1, n_mels, T]``, the aligned condition ``[1, C, T]``, the CFG scale ``[1]`` and the
         style codes. ``prosody_noise``: the prosody predictor's unit noise ``([1, noise_tok, N], [1, noise_glob])``
@@ -254,7 +257,10 @@ class GraphedAcoustic:
                          torch.full((1,), 0.0 if edge_scale is None else float(edge_scale), device=self.device)]
             h, mu, logw, x_mask, frames = enc(padded, torch.tensor([n], device=self.device), spk, z_tok, z_glob, scale,
                                               *extra)
-            if self.prosody_durations == "sampled":
+            if self.prosody_durations == "pauses":
+                rs = length_scale if regressor_scale is None else regressor_scale
+                attn, y_len = frames_to_alignment(pause_durations(frames, logw, padded, x_mask, rs), x_mask)
+            elif self.prosody_durations == "sampled":
                 attn, y_len = frames_to_alignment(frames, x_mask)
             else:
                 attn, y_len = durations_to_alignment(logw, x_mask, length_scale)

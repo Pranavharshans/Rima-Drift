@@ -7,7 +7,10 @@ own text is synthesised (T = 0.3, α = 2, ``vocos-ft``, seed = dataset index as 
 * ``predicted``: the released pipeline as is (:class:`Synthesizer`: sentence by sentence, 0.15 s pauses);
   ``pause-punct`` / ``pause-punct-j<J>``: the same with :class:`drifting_tts.prosody.PausePolicy` (jitter J);
 * ``release``: the release pipeline (v3.2): sentence by sentence, durations and token pitch sampled by the
-  ``--release-prosody`` predictor, punctuation pauses, vocoded by ``--release-vocoder``;
+  ``--release-prosody`` predictor, punctuation pauses, vocoded by ``--release-vocoder``; ``release-para``: the same
+  in paragraph mode (``Synthesizer(paragraph=True)``: consecutive sentences in one pass); ``release-pauses`` /
+  ``release-pauses-para``: with ``prosody_durations="pauses"`` (the pauses sampled, the letters' durations the
+  regressors');
 * one pass over the whole text (no sentence split), the prosody combined from ``+``-joined parts:
   ``onepass`` (predicted durations and pitch), ``oracle-dur`` (ground-truth MAS durations: the mel has the
   recording's frame count), ``oracle-pitch`` (ground-truth token pitch), ``oracle-both``, ``pitch-gain-<g>``
@@ -91,7 +94,7 @@ def add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--release-prosody", default=None,
                    help="system 'release': the stochastic prosody predictor (drift or a checkpoint)")
     p.add_argument("--release-prosody-temperature", type=float, default=None, help="default: the checkpoint's")
-    p.add_argument("--release-prosody-durations", choices=["sampled", "regressor"], default="sampled",
+    p.add_argument("--release-prosody-durations", choices=["sampled", "regressor", "pauses"], default="sampled",
                    help="system 'release': regressor = only the token pitch is sampled (v3.2)")
     p.add_argument("--release-prosody-duration-temperature", type=float, default=None,
                    help="system 'release': noise temperature of the sampled durations (default: the checkpoint's, "
@@ -117,6 +120,8 @@ class System:
     attn_window: int | None = None
     vocoder: str | None = None  # another vocoder (@voc=<name>; 'release': --release-vocoder)
     sampled: bool = False  # 'release': durations and token pitch from --release-prosody
+    durations: str | None = None  # 'release-pauses': its durations source instead of --release-prosody-durations
+    paragraph: bool = False  # 'release-para': the release pipeline in paragraph mode
 
     @property
     def needs_recording(self) -> bool:
@@ -150,8 +155,9 @@ def _parse_base(name: str, base: str) -> System:
         return System(name, base)
     if base == "predicted":
         return System(name, "split")
-    if base == "release":
-        return System(name, "split", jitter=0.0, vocoder="release", sampled=True)
+    if m := re.fullmatch(r"release(-pauses)?(-para)?", base):
+        return System(name, "split", jitter=0.0, vocoder="release", sampled=True,
+                      durations="pauses" if m.group(1) else None, paragraph=bool(m.group(2)))
     if m := re.fullmatch(r"pause-punct(?:-j([\d.]+))?", base):
         return System(name, "split", jitter=float(m.group(1) or 0.0))
     s = System(name, "onepass")
@@ -203,8 +209,8 @@ class Runner:
         """The Synthesizer of a system: the shared one, or a variant (same acoustic model) with another vocoder
         and / or the release's prosody predictor (with ``--release-model``: a Synthesizer of that model)."""
         voc = self.release.get("vocoder") if s.vocoder == "release" else s.vocoder
-        key = (voc, s.sampled)
-        if key == (None, False):
+        key = (voc, s.sampled, s.durations)
+        if key == (None, False, None):
             return self.synth
         if key not in self._synths:
             if s.sampled and not self.release.get("prosody"):
@@ -218,7 +224,7 @@ class Runner:
             kw = {} if voc is None else {"vocoder": voc}
             if s.sampled:
                 kw.update(prosody=self.release["prosody"], prosody_temperature=self.release.get("prosody_temperature"),
-                          prosody_durations=self.release.get("prosody_durations", "sampled"),
+                          prosody_durations=s.durations or self.release.get("prosody_durations", "sampled"),
                           prosody_duration_temperature=self.release.get("prosody_duration_temperature"))
             self._synths[key] = base.variant(**kw)
         return self._synths[key]
@@ -261,7 +267,7 @@ class Runner:
 
                 pause = PausePolicy.for_voice(self.speaker, jitter=s.jitter)
             return synth(u.text, speaker=self.speaker, cfg_scale=cfg, temperature=temperature, seed=seed,
-                         pause=pause, attn_window=s.attn_window)[0]
+                         pause=pause, attn_window=s.attn_window, paragraph=s.paragraph)[0]
         durations, pitch = self.prosody(u, s)
         g = torch.Generator(device=self.device).manual_seed(seed)
         mel, _ = self.model.synthesize(u.ids, torch.tensor([u.ids.shape[1]], device=self.device), self.spk,

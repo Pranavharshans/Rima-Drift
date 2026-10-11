@@ -49,12 +49,16 @@ def add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--prosody", default=None, help="stochastic prosody predictor: drift or a train-prosody checkpoint")
     p.add_argument("--prosody-temperature", type=float, default=None, help="default: the checkpoint's preferred one")
     p.add_argument("--prosody-spread", type=float, default=1.0)
-    p.add_argument("--prosody-durations", choices=["sampled", "regressor"], default="sampled")
+    p.add_argument("--prosody-durations", choices=["sampled", "regressor", "pauses"], default="sampled")
     p.add_argument("--prosody-duration-temperature", type=float, default=None,
                    help="noise temperature of the sampled durations (default: the checkpoint's preferred one, else "
                         "--prosody-temperature)")
     p.add_argument("--prosody-pitch-model", default=None,
                    help="a second prosody predictor that samples the token pitch; the durations stay --prosody's")
+    p.add_argument("--paragraph", type=int, nargs="?", const=180, default=0, metavar="CHARS",
+                   help="paragraph mode (Synthesizer(paragraph=CHARS)): the sentences of an item in one pass")
+    p.add_argument("--join", type=int, default=1,
+                   help="paragraph test set: every K consecutive texts joined into one item (after --num)")
     p.add_argument("--pause", type=pause_arg, default=0.15,
                    help="silence between the sentences of a multi-sentence item: seconds or 'punct' (per voice)")
     p.add_argument("--chunked", action="store_true",
@@ -98,6 +102,12 @@ def load_texts(spec: str) -> list[dict]:
     if path.suffix == ".jsonl":
         return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     return [{"id": f"{i:04d}", "text": t.strip()} for i, t in enumerate(path.read_text().splitlines()) if t.strip()]
+
+
+def join_items(items: list[dict], k: int) -> list[dict]:
+    """A paragraph test set: every ``k`` consecutive items as one (texts joined with a space, the first one's id)."""
+    return [{**items[i], "text": " ".join(it["text"].strip() for it in items[i: i + k])}
+            for i in range(0, len(items) - k + 1, k)]
 
 
 def band_match(wav: torch.Tensor, band: int) -> np.ndarray:
@@ -145,11 +155,13 @@ def run(args) -> None:
     (out / "wav").mkdir(parents=True, exist_ok=True)
     items = load_texts(args.texts)
     items = items[: args.num] if args.num else items
+    if args.join > 1:
+        items = join_items(items, args.join)
     synth = Synthesizer(args.model, args.device, vocoder=args.vocoder, cuda_kernel=args.cuda_kernel, fast=args.fast,
                         prosody=args.prosody, prosody_temperature=args.prosody_temperature,
                         prosody_spread=args.prosody_spread, prosody_durations=args.prosody_durations, pause=args.pause,
                         prosody_duration_temperature=args.prosody_duration_temperature,
-                        prosody_pitch=args.prosody_pitch_model)
+                        prosody_pitch=args.prosody_pitch_model, paragraph=args.paragraph or False)
     temperature = synth.default_temperature if args.temperature is None else args.temperature
     judges = load_judges(args.asr, None, args.mos, args.device)
 
@@ -211,6 +223,7 @@ def run(args) -> None:
                "model": args.model, "vocoder": args.vocoder or "stock", "asr": args.asr, "rows": [res],
                "prosody": args.prosody, "prosody_temperature": synth.prosody_temperature if args.prosody else None,
                "prosody_spread": args.prosody_spread, "prosody_durations": args.prosody_durations, "pause": args.pause,
+               "paragraph": args.paragraph, "join": args.join,
                "prosody_duration_temperature": synth.prosody_duration_temperature if args.prosody else None,
                "prosody_pitch_model": args.prosody_pitch_model}
     (out / "results.json").write_text(json.dumps(results, indent=2, ensure_ascii=False))

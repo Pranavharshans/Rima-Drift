@@ -101,7 +101,7 @@ def main() -> None:
     p.add_argument("--mode", choices=["sentence", "stream", "fast"], default="sentence")
     p.add_argument("--prosody", default=None, help="stochastic prosody predictor: drift or a checkpoint")
     p.add_argument("--prosody-temperature", type=float, default=None, help="default: the checkpoint's")
-    p.add_argument("--prosody-durations", choices=["sampled", "regressor"], default=None,
+    p.add_argument("--prosody-durations", choices=["sampled", "regressor", "pauses"], default=None,
                    help="regressor: only the token pitch is sampled (release v3.2); default: the release's, else "
                         "sampled")
     p.add_argument("--prosody-duration-temperature", type=float, default=None,

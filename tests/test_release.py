@@ -138,13 +138,15 @@ def test_from_pretrained_and_cli_release_from_a_local_mirror(tmp_path, monkeypat
     add_args(p)
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--vocoder", "griffin-lim"]))
     assert a == {"model_path": str(hub / "drifting_tts_v3.2.pt"), "vocoder": "griffin-lim", "prosody": "drift",
-                 "prosody_durations": "regressor", "pause": "punct"}
+                 "prosody_durations": "regressor", "pause": "punct", "paragraph": False}
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--prosody-durations", "sampled"]))
     assert a["prosody_durations"] == "sampled"
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--prosody", "none", "--pause", "0.2"]))
     assert a["prosody"] is None and a["pause"] == 0.2 and a["vocoder"] == "vocos-v2"
     a = pipeline_args(p.parse_args(["--model", "m.pt"]))  # no release: v3.1 behaviour
-    assert a == {"model_path": "m.pt", "vocoder": None, "prosody": None, "prosody_durations": "sampled", "pause": 0.15}
+    assert a == {"model_path": "m.pt", "vocoder": None, "prosody": None, "prosody_durations": "sampled", "pause": 0.15,
+                 "paragraph": False}
+    assert pipeline_args(p.parse_args(["--model", "m.pt", "--paragraph"]))["paragraph"] == 180
     a = pipeline_args(p.parse_args(["--model", "m.pt", "--pause-policy", "punct", "--pause-jitter", "1"]))
     assert a["pause"] == "punct:1.0"
 
@@ -322,3 +324,49 @@ def test_second_pitch_predictor_and_sentence_features_run_eagerly(tmp_path, monk
             synth.set_prosody(**kw)
         assert synth.acoustic is None
     assert len(built) == 1
+
+
+def test_paragraph_mode_synthesises_sentences_together(tmp_path):
+    """``paragraph``: consecutive sentences in one pass (one mel), the pause only between units; per call too."""
+    text = "merhaba dünya. nasılsın? bugün hava çok güzel."
+    synth = _synth(tmp_path, pause=0.2)
+    assert synth.units(text) == ["merhaba dünya.", "nasılsın?", "bugün hava çok güzel."]
+    assert synth.units(text, paragraph=True) == ["merhaba dünya. nasılsın? bugün hava çok güzel."]
+    assert synth.units(text, paragraph=25) == ["merhaba dünya. nasılsın?", "bugün hava çok güzel."]
+    para = synth.variant(paragraph=True)
+    assert para.paragraph and not synth.paragraph and para.model is synth.model
+    mels = para.mels(text, speaker=0)
+    assert len(mels) == 1
+    wav, _ = para(text, speaker=0)
+    assert wav.numel() == mels[0].shape[-1] * HOP_LENGTH  # one unit: no inserted pause
+    assert torch.equal(synth(text, speaker=0, paragraph=True)[0], wav)
+    assert torch.equal(torch.cat(list(para.stream(text, speaker=0))), wav)
+    two = synth(text, speaker=0, paragraph=25)[0]
+    assert two.numel() == sum(m.shape[-1] for m in synth.mels(text, speaker=0, paragraph=25)) * HOP_LENGTH \
+        + int(0.2 * SAMPLE_RATE)
+
+
+def test_pauses_durations_sample_between_words_only(tmp_path):
+    """``prosody_durations="pauses"``: the letters' durations are the regressors' (the model's factor of the voice),
+    the tokens between words the sampler's (its own factor)."""
+    from drifting_tts.models.prosody_net import boundary_tokens
+    from drifting_tts.text import text_to_ids
+
+    torch.save(_prosody_ck(), tmp_path / "prosody.pt")
+    synth = _synth(tmp_path, prosody=str(tmp_path / "prosody.pt"), prosody_durations="pauses")
+    assert synth._speaker(2)[1] == 1.05  # the call's scale carries the sampler's factor ...
+    spk = torch.tensor([2])
+    assert synth._regressor_scale(spk, 1.05) == pytest.approx(1.1)  # ... the letters get the model's
+    ids = torch.tensor([text_to_ids("merhaba dünya, nasılsın.", normalized=True)])
+    n = torch.tensor([ids.shape[1]])
+    g = torch.Generator().manual_seed(0)
+    frames, _ = synth.prosody.predict(synth.model, ids, n, spk, 0.5, 1.05, generator=g, regressor_scale=1.1)
+    _, _, logw, _ = synth.model.encoder(ids, n, spk)
+    letters = ~boundary_tokens(ids)
+    torch.testing.assert_close(frames[letters], torch.ceil(torch.exp(logw[:, 0]) * 1.1)[letters])
+    a, _ = synth(TEXT, speaker=2, seed=3)
+    assert torch.equal(synth(TEXT, speaker=2, seed=3)[0], a)
+    assert torch.equal(torch.cat(list(synth.stream(TEXT, speaker=2, seed=3))), a)
+    from drifting_tts.batched import batchable
+
+    assert not batchable(synth)  # the batched path has no pauses mode

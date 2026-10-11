@@ -62,7 +62,7 @@ def test_graphed_acoustic_matches_eager(text):
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA graphs need a GPU")
-@pytest.mark.parametrize("durations", ["sampled", "regressor"])
+@pytest.mark.parametrize("durations", ["sampled", "regressor", "pauses"])
 def test_graphed_acoustic_with_a_prosody_predictor_matches_eager(durations):
     """The drift prosody predictor inside the encoder's graph: the same draws and the same mel as
     ``ProsodyPredictor.predict`` followed by ``synthesize``."""
@@ -85,11 +85,12 @@ def test_graphed_acoustic_with_a_prosody_predictor_matches_eager(durations):
     with torch.no_grad():
         for seed in range(2):
             g = torch.Generator(device="cuda").manual_seed(seed)
-            frames, pitch = pred.predict(model, ids, n, spk, 0.7, 1.3, generator=g)
+            rs = 0.9 if durations == "pauses" else None  # the letters' scale (the regressors' factor)
+            frames, pitch = pred.predict(model, ids, n, spk, 0.7, 1.3, generator=g, regressor_scale=rs)
             ref, _ = model.synthesize(ids, n, spk, cfg_scale=1.5, temperature=0.5, length_scale=1.3, generator=g,
-                                      durations=frames if durations == "sampled" else None, pitch=pitch)
+                                      durations=None if durations == "regressor" else frames, pitch=pitch)
             g = torch.Generator(device="cuda").manual_seed(seed)
-            mel = fast(ids, spk, 1.5, 0.5, 1.3, generator=g, prosody_temperature=0.7)
+            mel = fast(ids, spk, 1.5, 0.5, 1.3, generator=g, prosody_temperature=0.7, regressor_scale=rs)
             assert mel.shape == ref.shape
             torch.testing.assert_close(mel, ref, rtol=0, atol=1e-4)
 
