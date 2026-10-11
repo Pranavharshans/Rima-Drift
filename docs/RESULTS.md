@@ -17,8 +17,8 @@ v3.2 keeps v3.1's acoustic weights and changes what surrounds them:
 | parameters at inference | 180.1 M | 89.3 M (67.7 M acoustic + 8.1 M prosody + 13.5 M vocoder) |
 
 ```python
-tts = Synthesizer.from_pretrained("v3.2", "cuda")   # vocoder="vocos-v2", prosody="drift", prosody_durations="regressor", pause="punct"
-v31 = tts.variant(vocoder="bigvgan-v2-ft", prosody=None, pause=0.15)   # v3.1, sharing the acoustic model
+tts = Synthesizer.from_pretrained("v3.2", "cuda")   # vocoder="vocos-v2", prosody="drift", prosody_durations="regressor", pause="punct", paragraph=True
+v31 = tts.variant(vocoder="bigvgan-v2-ft", prosody=None, pause=0.15, paragraph=False)   # v3.1, sharing the model
 ```
 
 **Freya-TR-Eval** (Freya-495: all 495 sentences, T = 0.3, α = 2, seed = sentence index, Whisper large-v3 on 8 kHz

@@ -74,8 +74,8 @@ sf.write("merhaba.wav", wav.numpy(), 24000)
 - `cfg_scale`: the guidance strength, learned during training, so it costs nothing at inference.
 - `pause`: the silence between sentences: `"punct"` (v3.2: by the final punctuation, measured per voice) or seconds
   (v3.1: 0.15).
-- `paragraph=True` (opt-in, recommended for multi-sentence text): consecutive sentences are synthesised together, up
-  to 180 characters per pass, so the model renders the gaps and the intonation across them. On Freya-TR-Eval read as
+- `paragraph` (v3.2: on; `paragraph=False` turns it off): consecutive sentences are synthesised together, up to 180
+  characters per pass, so the model renders the gaps and the intonation across them. On Freya-TR-Eval read as
   paragraphs of three sentences it lowers WER for all three voices (studio 1.33% → 0.97%, male 1.76% → 1.46%, female
   4.12% → 3.25%) and raises UTMOSv2 ([details](docs/PROSODY.md#in-the-pipeline-paragraph-mode-context-and-sampled-pauses-40)).
 - `context=True` (opt-in): each sentence is conditioned on the text before it; it gives the recordings' sentence

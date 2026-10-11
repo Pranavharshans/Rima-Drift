@@ -678,7 +678,7 @@ def pipeline_args(args) -> dict:
     durations = getattr(args, "prosody_durations", None) or rel.get("prosody_durations", "sampled")
     return {"model_path": model, "vocoder": args.vocoder or rel.get("vocoder"),
             "prosody": None if str(prosody).lower() == "none" else prosody, "prosody_durations": durations,
-            "pause": pause, "paragraph": getattr(args, "paragraph", 0) or False,
+            "pause": pause, "paragraph": getattr(args, "paragraph", 0) or rel.get("paragraph", False),
             "context": bool(getattr(args, "context", False))}
 
 
