@@ -113,7 +113,8 @@ Its outputs match this repository bit for bit on every deterministic path.
 
 ## In the browser (WebGPU)
 
-The model (v3.1's pipeline: the v3.2 prosody predictor and Vocos v2 are not exported to ONNX yet) also runs entirely
+The model (v3.1's pipeline: the v3.2 prosody predictor is not exported to ONNX yet; Vocos v2 exports with
+`scripts/export_onnx.py --vocoder vocos-v2` but is not published) also runs entirely
 client-side with [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/): the
 **[WebGPU demo](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-webgpu)** downloads about 385 MB once, and after
 that the text never leaves the device. On an RTX 5090 in Chrome the first audio arrives after about 0.1 s, and
@@ -151,7 +152,8 @@ host-ready audio; later chunks grow to reduce repeated vocoder work. `tts(text)`
 See [streaming, vocoders, memory settings and reproducible benchmarks](docs/MLX.md).
 
 - **Settings:** the same voices and options as the PyTorch API. The defaults are the recommended T = 0.3 and α = 2.
-  The MLX port runs v3.1's pipeline: the v3.2 prosody predictor and Vocos v2 are not ported yet.
+  The MLX port runs v3.1's pipeline: the v3.2 prosody predictor is not ported yet; Vocos v2 runs on the Vocos port
+  (`python -m drifting_tts.mlx.convert --vocoder vocos-v2`, not published yet).
 - **Vocoders:** BigVGAN-v2 by default; `Synthesizer.from_pretrained(vocoder="bigvgan-base-ft")` or `"vocos-ft"`
   (CLI `--vocoder`) uses a 14 M-parameter vocoder instead of 112 M ([quality](docs/VOCODERS.md),
   [MLX parity](docs/MLX.md#vocoders)). Only the chosen vocoder is downloaded.

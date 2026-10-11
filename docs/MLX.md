@@ -18,26 +18,30 @@ output is not a speaker playback test. The voices are `studio`, `male` and `fema
 
 ## Vocoders
 
-Three of the registry's vocoders ([docs/VOCODERS.md](VOCODERS.md)) have MLX ports. Each is one file in the `mlx/`
-folder of the model repo; the two small ones are for phones and laptops, where the vocoder is most of the time to
-first audio.
+Five of the registry's vocoders ([docs/VOCODERS.md](VOCODERS.md)) have MLX ports. Each is one file in the `mlx/`
+folder of the model repo; the small ones are for phones and laptops, where the vocoder is most of the time to first
+audio. `vocos-v2` (the vocoder of v3.2) and `vocos-v2-balanced` are `vocos-ft`'s network with other weights, so they
+run on the same port.
 
 | name | file in `mlx/` | parameters | stored as | streaming context | MLX vs PyTorch, real mels |
 |---|---|---|---|---|---|
 | `bigvgan-v2-ft` (default) | `vocoder.safetensors` | 112.4 M | float16, snake parameters float32 (225 MB) | 38 frames | 59.1 dB (98.9 dB in float32) |
 | `bigvgan-base-ft` | `bigvgan_base_ft.safetensors` | 14.0 M | float32 (56 MB) | 18 frames | 92.3–99.7 dB |
 | `vocos-ft` | `vocos_ft.safetensors` | 13.6 M | float32 (54 MB) | 29 frames | 95.0–104.4 dB |
+| `vocos-v2` | `vocos_v2.safetensors` | 13.6 M | float32 (54 MB) | 29 frames | 75.3–106.3 dB |
+| `vocos-v2-balanced` | `vocos_v2_balanced.safetensors` | 13.6 M | float32 (54 MB) | 29 frames | 92.7–103.4 dB |
 
 ```python
 from drifting_tts.mlx import Synthesizer
 
-tts = Synthesizer.from_pretrained(vocoder="bigvgan-base-ft")   # or "vocos-ft"; a .safetensors path also works
+tts = Synthesizer.from_pretrained(vocoder="bigvgan-base-ft")   # or "vocos-ft"; a converted .safetensors path also works
 ```
 
 The parity column is the SNR of the MLX waveform against the PyTorch vocoder on the same mels of the released
 acoustic model (three public sentences, MLX's Linux CPU backend; `scripts/check_mlx_parity.py`; BigVGAN-v2: the
 earlier measurement in [RESULTS.md](RESULTS.md#mlx)). Streamed MLX audio was bit-identical to whole-sentence MLX
-audio for both small vocoders. The listening and ASR quality of each vocoder is in [docs/VOCODERS.md](VOCODERS.md):
+audio for the small vocoders. The Vocos v2 files are not on the Hub yet: convert them (below) and pass the folder or
+the file. The listening and ASR quality of each vocoder is in [docs/VOCODERS.md](VOCODERS.md):
 `bigvgan-base-ft` is close to BigVGAN-v2 (UTMOSv2 2.91 vs 2.94), `vocos-ft` is the fastest and somewhat lower
 (2.63). Float16 storage would halve the small files, but Vocos then kept only 51.5 dB of parity (BigVGAN-v2 keeps
 59 dB), so they are stored in float32.
@@ -148,8 +152,8 @@ runs. The kernel's index arithmetic is checked here against the polyphase activa
 ```bash
 # the published layout: model.safetensors, config.json and vocoder.safetensors (BigVGAN-v2)
 python -m drifting_tts.mlx.convert --model drifting_tts_v3.1.pt --vocoder bigvgan-v2-ft --out mlx
-# the small vocoders: bigvgan_base_ft.safetensors and vocos_ft.safetensors
-python -m drifting_tts.mlx.convert --vocoder bigvgan-base-ft --vocoder vocos-ft --out mlx
+# the small vocoders: bigvgan_base_ft.safetensors and vocos_ft.safetensors (vocos-v2, vocos-v2-balanced likewise)
+python -m drifting_tts.mlx.convert --vocoder bigvgan-base-ft --vocoder vocos-ft --vocoder vocos-v2 --out mlx
 ```
 
 A vocoder is a registry name (the PyTorch checkpoint is read locally or from the Hub), `NAME=PATH` for a local
