@@ -38,6 +38,12 @@ unchanged.
 Or try any text in the **[online demo](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-demo)**, or run the model
 **[in your browser with WebGPU](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-webgpu)**.
 
+**Experimental, our own autoregressive model (ARDrift):** a causal transformer over 43 ms mel patches with a one-step
+drifting head (Pocket TTS's recipe, built here and trained from scratch on Vyvo/tr-dataset-12), with no pitch given:
+on Freya-TR-Eval it is more intelligible than v3.2 for every voice (studio 0.84%, male 1.79%, female 3.53%) at about
+the same UTMOSv2, and its intonation is the closest to the recordings measured here; first audio after 36 ms
+([docs/AR_DRIFT.md](docs/AR_DRIFT.md)). Not released yet.
+
 **Experimental:** the same model trained in the latent space of an audio VAE, with the VAE decoder fine-tuned on
 its latents: [DAC-VAE](https://huggingface.co/Vyvo/drifting-tts-tr-dacvae) (WER 1.32%, UTMOSv2 2.71) and
 [VoxCPM2](https://huggingface.co/Vyvo/drifting-tts-tr-voxcpm2) (1.87%, 2.53), against 0.66% and 2.93 for v3.1 on the
@@ -252,6 +258,7 @@ be added later by fine-tuning ([docs/TRAINING.md](docs/TRAINING.md#adding-a-voic
 | [docs/EVALUATION.md](docs/EVALUATION.md) | evaluation judges, the benchmark command, data scoring and filtering |
 | [docs/PROSODY.md](docs/PROSODY.md) | prosody metrics against recordings (`drifting-tts prosody`), oracle prosody, pitch gain, pause policy |
 | [docs/PROSODY_MODEL.md](docs/PROSODY_MODEL.md) | the stochastic prosody predictor of v3.2 (drifting), against regression and flow matching |
+| [docs/AR_DRIFT.md](docs/AR_DRIFT.md) | ARDrift, our own autoregressive model with a one-step drifting head (#42): design, training on Vyvo/tr-dataset-12, results against v3.2 |
 | [docs/LATENTS.md](docs/LATENTS.md) | audio-VAE latent spaces (DAC-VAE, VoxCPM): the backends, their resynthesis ceiling, the latent TTS pilots and the VoxCPM2 and DAC-VAE decoder GTA fine-tunes |
 | [docs/POCKET_TTS_GATE.md](docs/POCKET_TTS_GATE.md) | a Turkish Pocket TTS (autoregressive, Mimi latents) on Freya-100 with our judges and prosody metrics, and the Mimi codec gate (#42) |
 | [space/](space/) | the Gradio demo (`scripts/deploy_space.sh` deploys it) |
