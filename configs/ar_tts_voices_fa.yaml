@@ -1,0 +1,12 @@
+# The six new voices with their clips re-cut at the words (MMS forced alignment of the transcript; the clips of three
+# voices began with ~0.4 s of the previous sentence, which the model learned to read as the first words and then
+# swallowed them): configs/ar_tts_voices.yaml continued for 10k steps on data/tr12_eleven_podfa.
+base: ar_tts_voices.yaml
+
+data:
+  root: data/tr12_eleven_podfa
+
+train:
+  init_from: runs/ar_voices/model_ema.pt
+  steps: 10000
+  warmup: 500
