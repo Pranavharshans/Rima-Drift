@@ -3,12 +3,15 @@
 v3.2: text -> Turkish normaliser -> text encoder (durations) -> stochastic prosody predictor (token pitch sampled,
 trained with the drifting objective) -> ONE DriftDiT pass -> Vocos v2, sentences joined by punctuation-aware pauses.
 v3.1: the same acoustic weights with the deterministic pitch regressor, BigVGAN-v2-ft and 0.15 s pauses.
+ARDrift (experimental, docs/AR_DRIFT.md): our autoregressive model with a one-step drifting head; offered only when
+its checkpoint is deployed beside this app as ``ardrift.pt`` (``scripts/deploy_space.sh <space> <checkpoint>``).
 Code: https://github.com/kadirnar/drifting-tts. The weights are downloaded from https://huggingface.co/Vyvo/drifting-tts-tr
 (``Synthesizer.from_pretrained``); `scripts/deploy_space.sh` copies this app and the package into the Space.
 """
 
 import os
 import time
+from pathlib import Path
 
 import gradio as gr
 import numpy as np
@@ -40,6 +43,11 @@ RELEASES = {
     RHYTHM: v32_rhythm,
     "v3.1: deterministic intonation, BigVGAN-v2": v31,
 }
+# ARDrift as measured (Freya-495): Vocos v2 for every voice, sentence by sentence with punctuation pauses, no guidance
+ARDRIFT_FILE = Path(__file__).with_name("ardrift.pt")
+ardrift = Synthesizer(ARDRIFT_FILE, DEVICE, vocoder="vocos-v2", pause="punct") if ARDRIFT_FILE.is_file() else None
+if ardrift is not None:
+    RELEASES = {"ARDrift (experimental): autoregressive, intonation its own": ardrift, **RELEASES}
 VOICES = {"Studio male voice (recommended)": "studio", "Male voice": "male", "Female voice": "female"}
 MAX_CHARS = 600
 
@@ -73,6 +81,15 @@ more pauses inside sentences (held-out studio texts: 2.37 pauses per utterance, 
 slider's. Studio voice, Freya-495 over three seed sets: WER 1.40% / UTMOSv2 3.03, against 1.36% / 3.02 for v3.2.
 The other voices have too little data for it, so with them this option falls back to v3.2.
 """
+ARDRIFT_MD = """
+**ARDrift** (experimental): our own autoregressive model. A causal transformer generates the mel 43 ms at a time
+and a one-step drifting head samples each piece; it is given no pitch, its intonation is its own. Trained from
+scratch on Vyvo/tr-dataset-12, then with the studio voice; Vocos v2. Freya-495 WER / UTMOSv2 (noise temperature 0.5,
+no guidance): studio 0.84% / 3.01, male 1.79% / 2.90, female 3.53% / 2.67 (v3.2: 1.33% / 3.02, 2.28% / 2.90,
+3.99% / 2.72). On held-out studio sentences its pitch contour is the closest to the recordings measured so far (DTW
+F0 r 0.63 against 0.58 for v3.2), but its pitch spread is narrower, most for the female voice. Guidance makes it worse,
+so the guidance slider is not used with it; the noise temperature barely changes it.
+"""
 
 
 @gpu
@@ -85,7 +102,10 @@ def generate(text, release, voice, temperature, guidance, prosody_temperature, r
     if not normalize(text):
         raise gr.Error("Nothing to read after normalisation.")
     synth, note = RELEASES[release], ""
-    if synth is not v31 and VOICES[voice] != "studio":  # v3.2 with the vocoder balanced for the other voices
+    if synth is ardrift:
+        guidance = 1.0
+        note = " ARDrift: no guidance (it makes it worse)."
+    elif synth is not v31 and VOICES[voice] != "studio":  # v3.2 with the vocoder balanced for the other voices
         if release == RHYTHM:
             note = " Sampled rhythm is for the studio voice only: this voice used v3.2 (sampled intonation)."
         synth = v32_voices
@@ -95,7 +115,8 @@ def generate(text, release, voice, temperature, guidance, prosody_temperature, r
                       prosody_temperature=float(prosody_temperature) if synth.prosody is not None else None)
     took = time.time() - t0
     audio = (SAMPLE_RATE, np.clip(wav.float().numpy(), -1, 1))
-    stats = (f"{info['seconds']:.1f} s of audio in {took:.2f} s, one generator pass per sentence. "
+    passes = "23 generator steps per second of audio" if synth is ardrift else "one generator pass per sentence"
+    stats = (f"{info['seconds']:.1f} s of audio in {took:.2f} s, {passes}. "
              f"Normalised text: *{normalize(text)}*{note}")
     return audio, stats
 
@@ -133,7 +154,7 @@ with gr.Blocks(title="Drifting TTS: one-step Turkish TTS") as demo:
             audio = gr.Audio(label="Speech (24 kHz)", type="numpy", autoplay=True)
             stats = gr.Markdown()
     gr.Examples(EXAMPLES, inputs=[text])
-    gr.Markdown(RESULTS_MD)
+    gr.Markdown((ARDRIFT_MD if ardrift is not None else "") + RESULTS_MD)
     button.click(generate, [text, release, voice, temperature, guidance, prosody_temperature, rate, seed],
                  [audio, stats])
 
