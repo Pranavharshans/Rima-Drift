@@ -92,6 +92,9 @@ def test_train_ar_cli_and_synthesis(tmp_path):
     wav, info = synth("merhaba dünya. nasılsın?", speaker=0, temperature=0.5, seed=1)
     assert wav.numel() > 0 and torch.isfinite(wav).all()
     assert torch.equal(synth("merhaba dünya. nasılsın?", speaker=0, temperature=0.5, seed=1)[0], wav)
+    streamed = torch.cat(list(synth.stream("merhaba dünya. nasılsın?", speaker=0, temperature=0.5, seed=1)))
+    assert streamed.shape == wav.shape  # Griffin-Lim does not stream: one piece per sentence, the same draws
+    torch.testing.assert_close(streamed, wav, atol=1e-4, rtol=1e-4)
 
 
 def test_fast_generator_matches_generate():

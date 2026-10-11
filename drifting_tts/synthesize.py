@@ -587,6 +587,10 @@ class Synthesizer:
         It runs on windows of the sentence (the first one ``first`` + the vocoder's context + ``right`` frames long),
         so the first piece no longer waits for the whole sentence's mel; ``chunk`` is then ``chunked.chunk``. The
         output is another sample of the same model, not the same audio (docs/LATENCY.md)."""
+        if getattr(self.model, "generator", None) is None:  # ARDrift: generated step by step, streamed as it goes
+            yield from self._stream_ar(text, speaker, cfg_scale, temperature, length_scale, seed, pause, first, chunk,
+                                       paragraph, context)
+            return
         if chunked:
             yield from self._stream_chunked(text, speaker, cfg_scale, temperature, length_scale, seed, pause, first,
                                             prosody_temperature, Chunking() if chunked is True else chunked,
@@ -609,6 +613,52 @@ class Synthesizer:
             for piece in stream_vocoder(self.vocoder, mel, first=first, chunk=chunk, context=self.vocoder.context,
                                         graphs=self.vocoder_graphs):
                 yield piece.cpu()
+
+    def _stream_ar(self, text: str, speaker: str | int, cfg_scale: float, temperature: float, length_scale: float,
+                   seed: int, pause: Pause | None, first: int, chunk: int, paragraph: bool | int | None,
+                   context: bool | None) -> Iterator[torch.Tensor]:
+        """:meth:`stream` for an ARDrift model: each vocoder window runs as soon as the steps that cover it and its
+        right context are generated, so the first piece waits for ``first`` + context frames, not the sentence. The
+        same draws as :meth:`__call__` (the audio matches it up to the vocoder's streaming windows)."""
+        from .batched import stream_windows
+        from .fast import stream_vocoder, vocode_window
+        from .models.ar import ARGenerator
+
+        m = self.model
+        spk, tempo = self._speaker(speaker)
+        pause = self._pause(pause, speaker, context)
+        g = torch.Generator(device=self.device).manual_seed(seed)
+        gen = m.fast_generator or ARGenerator(m, graphs=False)
+        voc, ctx = self.vocoder, self.vocoder.context
+        sizes = () if ctx is None else (first + ctx, chunk + 2 * ctx)
+        rng, previous = random.Random(seed), None
+        for sentence, prev in self._units(text, paragraph, context):
+            ids, c = self.with_context(sentence, prev)
+            ids = torch.tensor([ids], device=self.device)
+            cond, _ = m.aligned_condition(ids, torch.tensor([ids.shape[1]], device=self.device), spk,
+                                          length_scale * tempo, context=c)
+            t = cond.shape[-1]
+            if previous is not None:
+                yield silence(pause, previous, rng)
+            previous = sentence
+            if m.pad_frames(cond).shape[-1] // m.patch > gen.max_steps:  # longer than the caches: whole sentence
+                mel = self.stats.denormalize(m.generate(cond, spk, temperature, g, cfg_scale=cfg_scale))
+                for piece in stream_vocoder(voc, mel, first=first, chunk=chunk, context=ctx,
+                                            graphs=self.vocoder_graphs):
+                    yield piece.cpu()
+                continue
+            steps = gen.steps(cond, spk, temperature, g, cfg_scale)
+            mel = torch.zeros(1, m.n_mels, m.pad_frames(cond).shape[-1], device=self.device)
+            done = 0
+            for a, b, start, n in stream_windows(t, first, chunk, ctx):
+                while done < b:
+                    mel[..., done: done + m.patch] = next(steps).view(1, m.patch, m.n_mels).transpose(1, 2)
+                    done += m.patch
+                x = self.stats.denormalize(mel[..., a:b])
+                yield vocode_window(voc, x, self.vocoder_graphs, sizes)[start * HOP_LENGTH: (start + n) * HOP_LENGTH
+                                                                        ].cpu()
+            for _ in steps:  # the remaining draws, so that the next sentence's match __call__'s
+                pass
 
     def _stream_chunked(self, text: str, speaker: str | int, cfg_scale: float, temperature: float,
                         length_scale: float, seed: int, pause: Pause | None, first: int,

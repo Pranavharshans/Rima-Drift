@@ -350,11 +350,21 @@ class ARGenerator:
         """As :meth:`ARDriftTTS.generate` (no prefix): aligned condition ``[B, C, T]`` -> mel ``[B, n_mels, T]``."""
         m = self.model
         T = cond.shape[-1]
+        if m.pad_frames(cond).shape[-1] // m.patch > self.max_steps:
+            return m.generate(cond, spk, temperature, generator, cfg_scale=cfg_scale)
+        out = list(self.steps(cond, spk, temperature, generator, cfg_scale))
+        return unpatchify(torch.stack(out, 1), m.patch, m.n_mels)[..., :T]
+
+    @torch.no_grad()
+    def steps(self, cond: Tensor, spk: Tensor, temperature: float = 1.0, generator: torch.Generator | None = None,
+              cfg_scale: float = 1.0):
+        """Yield the generated patches ``[B, k * n_mels]`` one step at a time (streaming); at most ``max_steps``."""
+        m = self.model
         cond = m.pad_frames(cond)
         cp = m.cond_patches(cond)
         B, S = cp.shape[:2]
         if S > self.max_steps:
-            return m.generate(cond, spk, temperature, generator, cfg_scale=cfg_scale)[..., :T]
+            raise ValueError(f"{S} steps: longer than the caches ({self.max_steps})")
         mu = patchify(cond[:, : m.n_mels], m.patch)
         guided = cfg_scale != 1.0
         st = self._buffers(B, cp.shape[-1], guided)
@@ -365,7 +375,6 @@ class ARGenerator:
             st["cfg"].fill_(cfg_scale)
         else:
             st["spk"].copy_(spk)
-        out = []
         for t in range(S):
             st["cp"].copy_(cp[:, t])
             st["mu"].copy_(mu[:, t])
@@ -376,9 +385,8 @@ class ARGenerator:
                 x = st["out"].clone()
             else:
                 x = st["run"]()
-            out.append(x)
             st["prev"].copy_(x)
-        return unpatchify(torch.stack(out, 1), m.patch, m.n_mels)[..., :T]
+            yield x
 
 
 def ar_features(x: Tensor, k: int, n_mels: int, detail: bool = True) -> dict[str, Tensor]:
