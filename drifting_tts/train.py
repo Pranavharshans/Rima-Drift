@@ -490,7 +490,12 @@ def load_tts(path: str | Path, device="cpu") -> tuple[DriftingTTS, Config, dict]
     """Load an exported (EMA) model: returns the model, its config and the mel statistics."""
     ck = torch.load(path, map_location="cpu", weights_only=False)
     cfg = Config(ck["config"])
-    model = DriftingTTS(cfg.model, num_speakers=ck["num_speakers"], n_mels=ck.get("n_mels", 100))
+    if cfg.model.get("kind") == "ar":  # ARDrift (train-ar): autoregressive with a one-step drifting head
+        from .models.ar import ARDriftTTS
+
+        model = ARDriftTTS(cfg.model, num_speakers=ck["num_speakers"], n_mels=ck.get("n_mels", 100))
+    else:
+        model = DriftingTTS(cfg.model, num_speakers=ck["num_speakers"], n_mels=ck.get("n_mels", 100))
     model.load_state_dict(ck["ema"])
     model.duration_scale = float(ck.get("duration_scale", 1.0))  # set by `drifting-tts calibrate-durations`
     model.duration_scales = {int(k): float(v) for k, v in ck.get("duration_scales", {}).items()}  # per voice

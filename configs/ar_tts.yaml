@@ -1,0 +1,67 @@
+# ARDrift (#42): our own autoregressive acoustic model with a one-step drifting head (drifting_tts/models/ar.py,
+# `drifting-tts train-ar`). Kyutai's Pocket TTS recipe (an autoregressive backbone, a one-step sampler head trained
+# with the drifting field at a learned temperature) on this repository's mels, text encoder and Vocos v2; trained
+# from scratch on Vyvo/tr-dataset-12 (`prepare --dataset Vyvo/tr-dataset-12 --backend bigvgan --f0 --save-audio`,
+# then `score`). No token pitch: the intonation is the autoregressive model's own.
+data:
+  root: data/tr12
+  min_quality: 0
+  max_frames: 1500         # <= 16 s, used whole (no crops)
+  filters:                 # scores.jsonl of `drifting-tts score`; a light filter keeps 84.7 of 91.8 h
+    min_mos: 2.5           # DNSMOS P.835 OVRL
+    rate: [8, 20]          # letters per second
+    max_cer: 0.15          # Whisper large-v3 against the transcript
+
+model:
+  kind: ar
+  text:                    # the text encoder of the DiT recipe (Grad-TTS style, monotonic alignment)
+    d: 192
+    heads: 2
+    layers: 6
+    ffn: 768
+    dropout: 0.1
+    spk_dim: 64
+  ar:
+    patch: 4               # mel frames per step: 43 ms, 23.4 steps per second
+    lookahead: 2           # the aligned text condition of the next steps, beside the current one's
+    dim: 512               # causal transformer over steps
+    depth: 12
+    heads: 8
+    mlp_ratio: 4.0
+    head_dim: 512          # the one-step drifting head: an adaLN residual MLP
+    head_depth: 6
+    noise_dim: null        # null: the patch size (4 x 100)
+
+drift:
+  crop_frames: 32          # shortest utterance used (frames)
+  gen_per_cond: 16         # head samples per step (the siblings of each drift problem); the recording is the positive
+  max_rows: 4096           # steps per batch that the head and the drift loss see (a random subset)
+  tau_init: 1.0            # Kyutai's learned temperature (raw), one for all feature maps
+  detail: true             # harmonic-detail features (each frame minus its frequency envelope)
+  input_noise: 0.3         # teacher-forced inputs get noise of a random level up to this (normalised mel units)
+  key_weights: {}
+
+loss:
+  drift: 1.0
+  prior: 1.0
+  duration: 1.0
+
+train:
+  seed: 0
+  steps: 100000
+  batch_size: 24
+  batch_frames: 24000
+  lr: 0.0002               # Kyutai: constant 2e-4, AdamW (0.9, 0.999), no weight decay, clip 3, EMA 0.999
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+  warmup: 2000
+  schedule: const
+  grad_clip: 3.0
+  ema_decay: 0.999
+  num_workers: 2
+  log_every: 50
+  sample_every: 5000
+  sample_temperature: 0.5
+  save_every: 5000
+  keep_snapshots: true
+  vocoder: vocos-v2
