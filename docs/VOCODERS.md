@@ -102,6 +102,51 @@ Streamed against whole-sentence audio, SNR in dB (full fp32), by context in fram
 | `revox` (all F0 sources) | revox | one piece per sentence | – | no (eager) |
 <!-- vocoders:end -->
 
+## On phones: ONNX, MLX and CPU latency (#8)
+
+On a phone the vocoder is most of the compute: BigVGAN-v2 has 112 M of the 180 M parameters of v3.1. The small
+vocoder that keeps the quality is **Vocos v2** (13.5 M, the vocoder of v3.2): on the v3.1 mels of Freya-495 it
+scores WER 1.18% / UTMOSv2 3.017 on the studio voice against 1.23% / 2.935 for `bigvgan-v2-ft` (above), and
+`vocos-v2-balanced` closes most of the gap on the male and female voices ([Speaker balance](#speaker-balance)).
+
+**Exports.**
+- **ONNX:** `scripts/export_onnx.py --only vocoder --vocoder vocos-v2` writes `vocoder.onnx` (and `--fp16` a
+  half-weight copy) with the same interface as the BigVGAN graph: log-mel `[1, 100, T]` -> waveform `[1, T * 256]`.
+  The ISTFT head is written with plain operators (no DFT / STFT node, which onnxruntime-web lacks on WebGPU): the
+  inverse real FFT of each frame is a product with a windowed DFT basis (513 x 1024), the overlap-add of
+  `n_fft = 4 hop` four shifted adds, and the squared-window envelope is built the same way, so `T` frames give
+  exactly `T * 256` samples (the `same` head). Against the synthesizer's `torch.fft` path the largest relative error
+  is 4e-6 to 8e-6 (`vocos-v2`, `vocos-v2-balanced`); `tests/test_export_onnx.py` checks it on a tiny Vocos.
+- **MLX:** `vocos-v2` and `vocos-v2-balanced` are `vocos-ft`'s network, so the MLX port runs them as they are
+  (`python -m drifting_tts.mlx.convert --vocoder vocos-v2`); parity with PyTorch on real mels 75–106 dB
+  ([MLX.md](MLX.md#vocoders)).
+- Neither file is on the Hub yet (`onnx/` and `mlx/` of `Vyvo/drifting-tts-tr` hold the v3.1 vocoders).
+
+**CPU latency** (`scripts/bench_vocoder_cpu.py`, ONNX Runtime 1.30 on the CPU, a shared AMD EPYC with training jobs
+running, fp32 graphs). *First window*: the vocoder's share of the time to first audio in streaming, 32 frames plus the
+vocoder's right context (BigVGAN-base 16, the others 32). *RTF*: a 3 s utterance in one call, compute time / audio
+duration.
+
+<!-- cpu:begin -->
+| vocoder | parameters | ONNX file (fp32 / fp16) | first window, 1 / 2 / 4 threads | RTF, 1 / 2 / 4 threads | fp16 weights: audio SNR |
+|---|---|---|---|---|---|
+| **`vocos-v2`** | 13.5 M | 58 / 29 MB | **10.5 / 6.5 / 4.1 ms** | **0.0127 / 0.0076 / 0.0044** | 52.7 dB |
+| `bigvgan-base-ft` | 14.0 M | 60 / 32 MB | 864 / 836 / 767 ms | 1.83 / 1.59 / 1.51 | 56.5 dB |
+| `bigvgan-v2-ft` | 112.4 M | 458 / 233 MB | 1693 / 1499 / 1449 ms | 2.67 / 2.08 / 2.01 | 63.1 dB |
+<!-- cpu:end -->
+
+- **Vocos is the only one of the three that runs in real time on one CPU core,** 80x faster than real time on one
+  thread: its ISTFT head replaces the upsampling stack. A 3 s utterance takes 38 ms, against 5.5 s for
+  BigVGAN-base, and the first streaming window 10.5 ms against 0.86 s.
+- **Neither BigVGAN runs in real time on this CPU,** with any thread count (RTF 1.5–2.7: a 3 s utterance takes
+  4.5–8 s). Its anti-aliased activations (an upsampling and a low-pass depthwise convolution around every snake)
+  dominate and barely parallelise: 4 threads gain 18–25%.
+- **fp16 weights** halve the files (Vocos 58 -> 29 MB) at 52.7 dB audio SNR against fp32 (BigVGAN-base 56.5 dB,
+  BigVGAN-v2 63.1 dB; median of 12 held-out mels).
+- The CPU is a stand-in. On iPhones the vocoder runs on the GPU through MLX ([MLX.md](MLX.md); BigVGAN's
+  activations can also run as fused Metal kernels, opt-in); the device measurements belong to the Swift engine
+  ([drifting-tts-swift](https://github.com/kadirnar/drifting-tts-swift)).
+
 ## Training Vocos further
 
 `vocos-ft` is the fastest vocoder but the least natural fine-tune. Its network stays as it is: the backbone, the

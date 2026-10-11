@@ -17,6 +17,8 @@ VOCODERS = {
     "bigvgan-v2-ft": "vocoder.safetensors",
     "bigvgan-base-ft": "bigvgan_base_ft.safetensors",
     "vocos-ft": "vocos_ft.safetensors",
+    "vocos-v2": "vocos_v2.safetensors",  # the vocoder of release v3.2
+    "vocos-v2-balanced": "vocos_v2_balanced.safetensors",  # the demo's vocoder of the male and female voices
 }
 DEFAULT_VOCODER = "bigvgan-v2-ft"
 METADATA_KEY = "drifting_tts.vocoder"
