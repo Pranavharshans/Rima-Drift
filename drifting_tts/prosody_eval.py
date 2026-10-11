@@ -309,7 +309,7 @@ class Runner:
         durations, pitch = self.prosody(u, s)
         frames = frames_from_logw(u.targets["logw"], self.tempo) if durations is None else durations[0]
         return token_report(u.targets, FRAME_RATE, frames=frames, pitch=None if pitch is None else pitch[0, 0],
-                            lf0_std=float(self.model.lf0_stats[1]))
+                            lf0_std=float(self.model.lf0_stats[1]) if self.model.pitch_enabled else 1.0)
 
 
 # --- CPU feature workers -----------------------------------------------------------------------------------------
