@@ -13,6 +13,7 @@ COMMANDS: dict[str, str] = {
     "train-mae": "drifting_tts.train_mae",
     "train": "drifting_tts.train",
     "train-ar": "drifting_tts.train_ar",
+    "train-bwe": "drifting_tts.train_bwe",
     "synthesize": "drifting_tts.synthesize",
     "evaluate": "drifting_tts.evaluate",
     "prosody": "drifting_tts.prosody_eval",

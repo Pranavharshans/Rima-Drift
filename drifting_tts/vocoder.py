@@ -429,6 +429,7 @@ class Vocoder:
         self = cls.__new__(cls)
         self.model, self.kind, self.device, self.mel, self.name, self.context = model, kind, device, mel, name, context
         self.noise, self.noise_seed = 0, None  # input-noise channels left unfolded (vocoder.objective: drift)
+        self.bwe, self.bwe_cutoff = None, None  # mel bandwidth extension in front (drifting_tts.bwe.extend_vocoder)
         return self
 
     @property
@@ -443,6 +444,8 @@ class Vocoder:
     def __call__(self, log_mel: Tensor) -> Tensor:
         """Unnormalised log-mel ``[B, 100, T]`` -> waveform ``[B, samples]`` at 24 kHz."""
         x = log_mel.to(self.device).float()
+        if getattr(self, "bwe", None) is not None:
+            x = self.bwe.extend(x, self.bwe_cutoff)
         if self.noise:
             g = torch.Generator(device=self.device).manual_seed(self.noise_seed)
             x = torch.cat([x, torch.randn(x.shape[0], self.noise, x.shape[-1], generator=g, device=self.device)], 1)
