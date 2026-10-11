@@ -390,6 +390,7 @@ model (CRPS), but it is 10–14% flatter and needs 8 network evaluations. BERTur
 | #38 | prosody diagnostics: metrics against recordings on the same texts, oracle prosody A/B, punctuation-aware pauses, pitch-gain sweep |
 | #39 | stochastic prosody predictor (drifting), with its own temperature |
 | #40 | context: word-level features, paragraph mode |
+| #41 | SSL (WavLM) adversarial term on the acoustic model |
 | #42 | strategic: Kyutai's Pocket TTS recipe on Turkish |
 | #27 | latent models: generator-side fixes (over-smooth latents, flat prosody) |
 | #17, #19 | latent TTS and the vocoder / latent tracking issue |
