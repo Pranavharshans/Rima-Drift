@@ -1,0 +1,21 @@
+# ARDrift fine-tune (#42): the tr-dataset-12 pretraining (configs/ar_tts.yaml) continued on the corpus with the
+# studio voice (data/tr12_eleven: tr-dataset-12 plus the studio voice 722, listed twice, and its male / female
+# voices; the same speaker IDs and mel statistics). The speaker table grows by one row (722, started at the mean).
+base: ar_tts.yaml
+
+data:
+  root: data/tr12_eleven
+  filters:                 # the DiT recipe's filters (configs/tts_v3.yaml)
+    min_mos: 3.0
+    min_spk_sim: 0.5
+    rate: [8, 20]
+    min_bandwidth: 10000
+    max_cer: 0.15
+
+drift:
+  cond_dropout: 0.15       # learn the null condition too: guidance on the backbone state at inference
+
+train:
+  init_from: runs/ar_pre/model_ema.pt
+  steps: 40000
+  warmup: 1000

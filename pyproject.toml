@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drifting-tts"
+version = "0.1.0"
+description = "One-step text-to-speech with Drifting Models (arXiv 2602.04770)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Kadir Nar", email = "kadir.nar@hotmail.com" }]
+dependencies = [
+    "torch>=2.4",
+    "torchaudio>=2.4",
+    "numpy",
+    "numba",
+    "einops",
+    "pyyaml",
+    "soundfile",
+    "pyarrow",
+    "tqdm",
+    "tensorboard",
+    "vocos",
+    "pyworld",
+    # pyworld 0.3.5 imports pkg_resources at runtime; setuptools 81 removed it.
+    "setuptools<81",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+# evaluation judges: Whisper large-v3, WavLM-Large + ECAPA-TDNN, UTMOSv2 (not on PyPI; it pulls torchvision, so
+# install torchvision first from the same index as torch, e.g. --index-url https://download.pytorch.org/whl/cu128)
+eval = ["faster-whisper", "transformers", "safetensors",
+        "utmosv2 @ git+https://github.com/sarulab-speech/UTMOSv2.git@v1.3.0"]
+bigvgan = ["librosa", "scipy", "matplotlib", "nnAudio"]   # BigVGAN-v2 backend (its code imports these; nnAudio: CQT-D)
+# data scoring (`drifting-tts score`): Whisper large-v3, DNSMOS (Microsoft's ONNX models run in torch), ECAPA
+score = ["faster-whisper>=1.1", "rapidfuzz", "speechmos", "onnx", "onnx2torch", "librosa", "speechbrain>=1.0"]
+# audio-VAE latent spaces (`drifting_tts.latents`): the model code is vendored (upstream packages pin protobuf or pull
+# in a whole TTS stack), so only the Hub client is needed to fetch facebook/dacvae-watermarked, openbmb/VoxCPM2 / 1.5
+dacvae = ["huggingface_hub"]
+voxcpm = ["huggingface_hub"]
+# the `revox` vocoder: Minori Live's Revox Vocoder 1.0 ONNX (CC BY-NC-SA 4.0, non-commercial), fetched at runtime
+revox = ["onnxruntime", "huggingface_hub"]
+# MLX inference on Apple silicon (`drifting_tts.mlx`); on Linux install "mlx[cpu]" or "mlx[cuda]" instead
+mlx = ["mlx>=0.29", "huggingface_hub"]
+
+[project.scripts]
+drifting-tts = "drifting_tts.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["drifting_tts*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E731", "B905"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
