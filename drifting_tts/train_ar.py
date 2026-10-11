@@ -191,8 +191,8 @@ def run(args) -> None:
             log_samples(ema.model, val_ds, vocoder, work / "samples", step, device,
                         temperature=tc.get("sample_temperature", 0.5))
         if step % tc.save_every == 0 or step == tc.steps:
-            save_checkpoint(work / "last.pt", model=model.state_dict(), ema=ema.model.state_dict(), tau=float(tau.detach()),
-                            opt=opt.state_dict(), sched=sched.state_dict(), step=step, rng=rng_state(),
+            save_checkpoint(work / "last.pt", model=model.state_dict(), ema=ema.model.state_dict(),
+                            tau=float(tau.detach()), opt=opt.state_dict(), sched=sched.state_dict(), step=step, rng=rng_state(),
                             epoch=loader.batch_sampler.epoch, config=cfg.to_dict(), num_speakers=ds.num_speakers)
             save_checkpoint(work / "model_ema.pt", ema=ema.model.state_dict(), config=cfg.to_dict(),
                             num_speakers=ds.num_speakers, step=step, tau=float(tau.detach()), n_mels=ds.dim,

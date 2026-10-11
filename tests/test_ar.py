@@ -66,7 +66,8 @@ def test_features_and_training_step_backpropagate():
     loss, metrics = training_step(m, batch, cfg, "cpu", tau)
     loss.backward()
     assert torch.isfinite(loss) and metrics["rows"] == 8
-    assert tau.grad is not None and m.head.out.weight.grad.abs().sum() > 0 and m.blocks[0].attn.qkv.weight.grad is not None
+    assert tau.grad is not None and m.head.out.weight.grad.abs().sum() > 0
+    assert m.blocks[0].attn.qkv.weight.grad is not None
     f = ar_features(torch.randn(3, 5, 400), 4, 100)
     assert f["patch"].shape == (3, 5, 1, 400) and f["frame"].shape == (3, 5, 4, 100) == f["detail"].shape
 
