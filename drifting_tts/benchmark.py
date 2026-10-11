@@ -57,6 +57,8 @@ def add_args(p: argparse.ArgumentParser) -> None:
                    help="a second prosody predictor that samples the token pitch; the durations stay --prosody's")
     p.add_argument("--paragraph", type=int, nargs="?", const=180, default=0, metavar="CHARS",
                    help="paragraph mode (Synthesizer(paragraph=CHARS)): the sentences of an item in one pass")
+    p.add_argument("--context", action="store_true",
+                   help="Synthesizer(context=True): each sentence conditioned on the text before it")
     p.add_argument("--join", type=int, default=1,
                    help="paragraph test set: every K consecutive texts joined into one item (after --num)")
     p.add_argument("--pause", type=pause_arg, default=0.15,
@@ -161,7 +163,8 @@ def run(args) -> None:
                         prosody=args.prosody, prosody_temperature=args.prosody_temperature,
                         prosody_spread=args.prosody_spread, prosody_durations=args.prosody_durations, pause=args.pause,
                         prosody_duration_temperature=args.prosody_duration_temperature,
-                        prosody_pitch=args.prosody_pitch_model, paragraph=args.paragraph or False)
+                        prosody_pitch=args.prosody_pitch_model, paragraph=args.paragraph or False,
+                        context=args.context)
     temperature = synth.default_temperature if args.temperature is None else args.temperature
     judges = load_judges(args.asr, None, args.mos, args.device)
 
@@ -223,7 +226,7 @@ def run(args) -> None:
                "model": args.model, "vocoder": args.vocoder or "stock", "asr": args.asr, "rows": [res],
                "prosody": args.prosody, "prosody_temperature": synth.prosody_temperature if args.prosody else None,
                "prosody_spread": args.prosody_spread, "prosody_durations": args.prosody_durations, "pause": args.pause,
-               "paragraph": args.paragraph, "join": args.join,
+               "paragraph": args.paragraph, "join": args.join, "context": args.context,
                "prosody_duration_temperature": synth.prosody_duration_temperature if args.prosody else None,
                "prosody_pitch_model": args.prosody_pitch_model}
     (out / "results.json").write_text(json.dumps(results, indent=2, ensure_ascii=False))

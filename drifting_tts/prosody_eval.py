@@ -10,7 +10,7 @@ own text is synthesised (T = 0.3, α = 2, ``vocos-ft``, seed = dataset index as 
   ``--release-prosody`` predictor, punctuation pauses, vocoded by ``--release-vocoder``; ``release-para``: the same
   in paragraph mode (``Synthesizer(paragraph=True)``: consecutive sentences in one pass); ``release-pauses`` /
   ``release-pauses-para``: with ``prosody_durations="pauses"`` (the pauses sampled, the letters' durations the
-  regressors');
+  regressors'); a ``-ctx`` suffix (e.g. ``release-ctx``): each sentence conditioned on the text before it;
 * one pass over the whole text (no sentence split), the prosody combined from ``+``-joined parts:
   ``onepass`` (predicted durations and pitch), ``oracle-dur`` (ground-truth MAS durations: the mel has the
   recording's frame count), ``oracle-pitch`` (ground-truth token pitch), ``oracle-both``, ``pitch-gain-<g>``
@@ -122,6 +122,7 @@ class System:
     sampled: bool = False  # 'release': durations and token pitch from --release-prosody
     durations: str | None = None  # 'release-pauses': its durations source instead of --release-prosody-durations
     paragraph: bool = False  # 'release-para': the release pipeline in paragraph mode
+    context: bool = False  # 'release-ctx': each sentence conditioned on the text before it
 
     @property
     def needs_recording(self) -> bool:
@@ -155,9 +156,10 @@ def _parse_base(name: str, base: str) -> System:
         return System(name, base)
     if base == "predicted":
         return System(name, "split")
-    if m := re.fullmatch(r"release(-pauses)?(-para)?", base):
+    if m := re.fullmatch(r"release(-pauses)?(-para)?(-ctx)?", base):
         return System(name, "split", jitter=0.0, vocoder="release", sampled=True,
-                      durations="pauses" if m.group(1) else None, paragraph=bool(m.group(2)))
+                      durations="pauses" if m.group(1) else None, paragraph=bool(m.group(2)),
+                      context=bool(m.group(3)))
     if m := re.fullmatch(r"pause-punct(?:-j([\d.]+))?", base):
         return System(name, "split", jitter=float(m.group(1) or 0.0))
     s = System(name, "onepass")
@@ -267,7 +269,7 @@ class Runner:
 
                 pause = PausePolicy.for_voice(self.speaker, jitter=s.jitter)
             return synth(u.text, speaker=self.speaker, cfg_scale=cfg, temperature=temperature, seed=seed,
-                         pause=pause, attn_window=s.attn_window, paragraph=s.paragraph)[0]
+                         pause=pause, attn_window=s.attn_window, paragraph=s.paragraph, context=s.context)[0]
         durations, pitch = self.prosody(u, s)
         g = torch.Generator(device=self.device).manual_seed(seed)
         mel, _ = self.model.synthesize(u.ids, torch.tensor([u.ids.shape[1]], device=self.device), self.spk,

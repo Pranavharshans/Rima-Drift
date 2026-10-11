@@ -187,15 +187,16 @@ class GraphedAcoustic:
     def __call__(self, ids: Tensor, spk: Tensor, cfg_scale: float, temperature: float, length_scale: float,
                  generator: torch.Generator | None = None, prosody_temperature: float = 1.0,
                  duration_temperature: float | None = None, rhythm: Tensor | None = None,
-                 edge_scale: float | None = None, regressor_scale: float | None = None) -> Tensor:
+                 edge_scale: float | None = None, regressor_scale: float | None = None, context: int = 0) -> Tensor:
         """Token ids ``[1, N]`` -> normalised mel ``[1, n_mels, T]``, as ``synthesize`` with ``steps=1`` (with a
         prosody predictor: as ``ProsodyPredictor.predict`` at ``prosody_temperature`` / ``duration_temperature``,
         for the rhythm of speaker ``rhythm`` with the voice's regressor durations at ``edge_scale`` on the sentence's
         edges, then ``synthesize``). The last three need ``duration_row``. ``regressor_scale``: the letters' scale
-        with ``prosody_durations="pauses"`` (default ``length_scale``, which then scales the sampled pauses)."""
+        with ``prosody_durations="pauses"`` (default ``length_scale``, which then scales the sampled pauses).
+        ``context``: leading tokens that only condition the rest (``DriftingTTS.synthesize``)."""
         z, cond, alpha, labels = self.prepare(ids, spk, cfg_scale, temperature, length_scale, generator,
                                               prosody_temperature, duration_temperature, rhythm, edge_scale,
-                                              regressor_scale=regressor_scale)
+                                              regressor_scale=regressor_scale, context=context)
         return self.generate_window(z, cond, spk, alpha, None, labels)
 
     @torch.no_grad()
@@ -218,7 +219,7 @@ class GraphedAcoustic:
                 generator: torch.Generator | None = None, prosody_temperature: float = 1.0,
                 duration_temperature: float | None = None, rhythm: Tensor | None = None,
                 edge_scale: float | None = None, prosody_noise: tuple[Tensor, Tensor] | None = None,
-                regressor_scale: float | None = None) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+                regressor_scale: float | None = None, context: int = 0) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """The DiT's inputs of :meth:`__call__` (the encoder's graph, the alignment and the draws): the noise scaled
         by ``temperature`` ``[1, n_mels, T]``, the aligned condition ``[1, C, T]``, the CFG scale ``[1]`` and the
         style codes. ``prosody_noise``: the prosody predictor's unit noise ``([1, noise_tok, N], [1, noise_glob])``
@@ -234,6 +235,7 @@ class GraphedAcoustic:
         padded[:, :n] = ids
         if self.prosody is None:
             h, mu, logw, x_mask = enc(padded, torch.tensor([n], device=self.device), spk)
+            h, mu, logw, x_mask = (t[..., context:] for t in (h, mu, logw, x_mask))
             attn, y_len = durations_to_alignment(logw, x_mask, length_scale)  # reads T on the host
         else:  # the prosody noise first, as ProsodyPredictor._draw (one pass, spread 1)
             net = self.prosody.net
@@ -257,6 +259,9 @@ class GraphedAcoustic:
                          torch.full((1,), 0.0 if edge_scale is None else float(edge_scale), device=self.device)]
             h, mu, logw, x_mask, frames = enc(padded, torch.tensor([n], device=self.device), spk, z_tok, z_glob, scale,
                                               *extra)
+            if context:  # the leading tokens only condition the rest (DriftingTTS.synthesize)
+                h, mu, logw, x_mask = (t[..., context:] for t in (h, mu, logw, x_mask))
+                frames, padded = frames[:, context:], padded[:, context:]
             if self.prosody_durations == "pauses":
                 rs = length_scale if regressor_scale is None else regressor_scale
                 attn, y_len = frames_to_alignment(pause_durations(frames, logw, padded, x_mask, rs), x_mask)

@@ -138,14 +138,15 @@ def test_from_pretrained_and_cli_release_from_a_local_mirror(tmp_path, monkeypat
     add_args(p)
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--vocoder", "griffin-lim"]))
     assert a == {"model_path": str(hub / "drifting_tts_v3.2.pt"), "vocoder": "griffin-lim", "prosody": "drift",
-                 "prosody_durations": "regressor", "pause": "punct", "paragraph": False}
+                 "prosody_durations": "regressor", "pause": "punct", "paragraph": False,
+                 "context": False}
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--prosody-durations", "sampled"]))
     assert a["prosody_durations"] == "sampled"
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--prosody", "none", "--pause", "0.2"]))
     assert a["prosody"] is None and a["pause"] == 0.2 and a["vocoder"] == "vocos-v2"
     a = pipeline_args(p.parse_args(["--model", "m.pt"]))  # no release: v3.1 behaviour
     assert a == {"model_path": "m.pt", "vocoder": None, "prosody": None, "prosody_durations": "sampled", "pause": 0.15,
-                 "paragraph": False}
+                 "paragraph": False, "context": False}
     assert pipeline_args(p.parse_args(["--model", "m.pt", "--paragraph"]))["paragraph"] == 180
     a = pipeline_args(p.parse_args(["--model", "m.pt", "--pause-policy", "punct", "--pause-jitter", "1"]))
     assert a["pause"] == "punct:1.0"
@@ -370,3 +371,33 @@ def test_pauses_durations_sample_between_words_only(tmp_path):
     from drifting_tts.batched import batchable
 
     assert not batchable(synth)  # the batched path has no pauses mode
+
+
+def test_context_conditions_each_sentence_on_the_one_before(tmp_path):
+    """``context``: the previous unit runs through the text encoder and the prosody predictor with the current one,
+    and only the current one is generated."""
+    from drifting_tts.text import text_to_ids
+
+    ids, ctx = Synthesizer.with_context("nasılsın?", "merhaba dünya.")
+    assert ctx == 2 * len("merhaba dünya.") + 2 and ids[ctx:] == text_to_ids("nasılsın?", normalized=True)
+    assert Synthesizer.with_context("nasılsın?", None) == (text_to_ids("nasılsın?", normalized=True), 0)
+    long = " ".join(["kelime"] * 40) + "."  # only the end of a long previous unit, whole words, fits
+    ids, ctx = Synthesizer.with_context("nasılsın?", long)
+    assert 0 < ctx and len(ids) <= 2 * 190 + 1 and ids[1] == text_to_ids("kelime", normalized=True)[1]
+
+    torch.save(_prosody_ck(), tmp_path / "prosody.pt")
+    synth = _synth(tmp_path, prosody=str(tmp_path / "prosody.pt"), prosody_durations="regressor")
+    plain = synth.mels(TEXT, speaker=2, seed=1)
+    with_ctx = synth.mels(TEXT, speaker=2, seed=1, context=True)
+    assert len(with_ctx) == len(plain) == 2
+    assert torch.equal(with_ctx[0], plain[0])  # the first sentence has nothing before it
+    assert not torch.equal(with_ctx[1], plain[1])  # the second one sees the first
+    tts = synth.model  # the second sentence alone has the length of its own tokens only
+    ids = torch.tensor([text_to_ids("nasılsın?", normalized=True)])
+    _, _, logw, _ = tts.encoder(ids, torch.tensor([ids.shape[1]]), torch.tensor([2]))
+    full = torch.tensor([Synthesizer.with_context("nasılsın?", "merhaba dünya.")[0]])
+    _, _, logw_ctx, _ = tts.encoder(full, torch.tensor([full.shape[1]]), torch.tensor([2]))
+    frames = torch.ceil(torch.exp(logw_ctx[0, 0, -ids.shape[1]:]) * 1.1).sum()
+    assert with_ctx[1].shape[-1] == int(frames)
+    wav, _ = synth.variant(context=True)(TEXT, speaker=2, seed=1)
+    assert torch.equal(torch.cat(list(synth.stream(TEXT, speaker=2, seed=1, context=True))), wav)
