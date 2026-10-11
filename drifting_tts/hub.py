@@ -26,8 +26,10 @@ PROSODY_MODELS: dict[str, tuple[str, str | None]] = {
 # WER 1.74% -> 5.78% male, 3.02% -> 11.28% female), so the durations stay v3.1's regressors'.
 RELEASES: dict[str, dict] = {
     "v3.1": {"model": "drifting_tts_v3.1.pt", "vocoder": "bigvgan-v2-ft", "prosody": None, "pause": 0.15},
+    # paragraph mode: consecutive sentences in one pass (on Freya read as paragraphs: lower WER for every voice, higher
+    # UTMOSv2 for the male and female voices; docs/PROSODY.md); single sentences are synthesised as before
     "v3.2": {"model": "drifting_tts_v3.2.pt", "vocoder": "vocos-v2", "prosody": "drift",
-             "prosody_durations": "regressor", "pause": "punct"},
+             "prosody_durations": "regressor", "pause": "punct", "paragraph": True},
 }
 LATEST = "v3.2"
 

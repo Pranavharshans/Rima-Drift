@@ -26,7 +26,7 @@ except ImportError:  # running locally
 
 DEVICE = os.environ.get("DEMO_DEVICE", "cuda")
 v32 = Synthesizer.from_pretrained("v3.2", DEVICE)  # vocos-v2, prosody="drift" (pitch only), pause="punct"
-v31 = v32.variant(vocoder="bigvgan-v2-ft", prosody=None, pause=0.15)  # same acoustic model, loaded once
+v31 = v32.variant(vocoder="bigvgan-v2-ft", prosody=None, pause=0.15, paragraph=False)  # v3.1 as released
 # opt-in: the prosody model samples the durations (rhythm, pauses inside sentences) too, the letters' durations at
 # prosody temperature 0.3 (at 0.5 they cost words: Freya-495 WER 1.89% against 1.33%), the pauses and the pitch at the
 # slider's; studio voice only, since the voices with little data still slip on words (docs/PROSODY_MODEL.md)

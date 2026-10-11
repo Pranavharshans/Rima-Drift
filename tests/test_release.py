@@ -129,6 +129,7 @@ def test_from_pretrained_and_cli_release_from_a_local_mirror(tmp_path, monkeypat
     assert synth.prosody_durations == "regressor"  # v3.2 samples the token pitch only
     v31 = Synthesizer.from_pretrained("v3.1", "cpu", vocoder="griffin-lim")
     assert v31.prosody is None and v31.pause == 0.15
+    assert synth.paragraph is True and v31.paragraph is False  # paragraph mode is v3.2's default, not v3.1's
     with pytest.raises(ValueError, match="v3.2"):
         Synthesizer.from_pretrained("v9", "cpu")
 
@@ -138,7 +139,7 @@ def test_from_pretrained_and_cli_release_from_a_local_mirror(tmp_path, monkeypat
     add_args(p)
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--vocoder", "griffin-lim"]))
     assert a == {"model_path": str(hub / "drifting_tts_v3.2.pt"), "vocoder": "griffin-lim", "prosody": "drift",
-                 "prosody_durations": "regressor", "pause": "punct", "paragraph": False,
+                 "prosody_durations": "regressor", "pause": "punct", "paragraph": True,
                  "context": False}
     a = pipeline_args(p.parse_args(["--release", "v3.2", "--prosody-durations", "sampled"]))
     assert a["prosody_durations"] == "sampled"

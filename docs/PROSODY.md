@@ -307,8 +307,8 @@ voice's have several sentences):
 Three opt-in options of `Synthesizer` (and `drifting-tts synthesize / benchmark`), for any release:
 
 ```python
-tts = Synthesizer.from_pretrained("v3.2", "cuda")
-wav, _ = tts(text, speaker="studio", cfg_scale=2.0, temperature=0.3, context=True)    # or paragraph=True
+tts = Synthesizer.from_pretrained("v3.2", "cuda")   # paragraph mode on (the release's default since #40)
+wav, _ = tts(text, speaker="studio", cfg_scale=2.0, temperature=0.3, paragraph=False, context=True)
 tts_pauses = tts.variant(prosody=tts.prosody, prosody_durations="pauses")            # studio voice only
 ```
 
@@ -381,6 +381,15 @@ WER [95% CI] / UTMOSv2 (CI ±0.03–0.04). Seed = item index, so these v3.2 rows
 - **Sampled pauses on top raise UTMOSv2 further but cost the male and female voices words** (2.15%, 3.81%), as on
   Freya-495: their recordings pause irregularly and the sampler reproduces it. For the studio voice the combination
   keeps WER (1.18%) and gives the highest UTMOSv2 (3.043).
+- **Decided by metrics** (the A/B listening test heard little difference). Paired against v3.2 on the same 165
+  items (bootstrap 95% intervals; `runs/agents/lead2/metrics`): paragraph mode lowers the word errors on every voice
+  (−14 / −12 / −34 of 4,000–4,200 words; female significant) and raises UTMOSv2 (studio +0.030 [+0.000, +0.061],
+  male +0.136 [+0.080, +0.190], female +0.065 [+0.020, +0.111]) and DNSMOS OVRL for male and female (+0.038,
+  +0.061; studio −0.013). It costs ~0.01 WavLM-ECAPA similarity to the voice's recordings and narrows the F0 spread
+  of the studio and female voices (−0.19 / −0.13 st: one declination over a paragraph instead of one per sentence;
+  the contour match with recordings is unchanged, DTW r 0.577 against 0.579). **Paragraph mode is therefore the
+  default of the v3.2 pipeline** (`hub.RELEASES`, `from_pretrained("v3.2")`, `--release v3.2`); `paragraph=False`
+  restores sentence-by-sentence synthesis, and v3.1 keeps it off.
 - **Longer training windows are not needed for this.** The DiT was trained on 2.7 s crops; in paragraph mode it
   generates units of up to 180 characters (about 13 s) in one pass, and does better than on single sentences. The
   third item of #40 (training on full utterances) therefore has no measured problem to solve.
