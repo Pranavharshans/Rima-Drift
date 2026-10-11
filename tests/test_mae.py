@@ -64,3 +64,16 @@ def test_spectral_detail_removes_the_envelope():
     comb = torch.zeros(1, 10, 5)
     comb[:, ::2] = 1.0  # harmonic-like alternation along frequency
     assert spectral_detail(comb).abs().mean() > 0.3
+
+
+def test_delta_features_see_frame_changes_of_repeated_latents():
+    from drifting_tts.models.mae import delta_features
+
+    native = torch.randn(2, 6, 16)
+    x = native.repeat_interleave(4, -1)  # latents repeated 4x, as extract-latents writes them
+    f = delta_features(x, stride=4, windows=(4,), raw_patch=5)
+    d = native[..., 1:] - native[..., :-1]
+    assert torch.allclose(f["delta_std"][:, 0], d.std(-1, unbiased=False), atol=1e-4)
+    assert f["delta_std4"].shape == (2, 3, 6) and f["delta_patch5"].shape == (2, 3, 30)
+    smooth = delta_features(torch.nn.functional.avg_pool1d(x, 9, 1, 4, count_include_pad=False), stride=4)
+    assert (smooth["delta_std"] < f["delta_std"]).all()  # temporal smoothing lowers the roughness features
