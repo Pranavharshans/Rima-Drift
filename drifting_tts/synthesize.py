@@ -111,8 +111,8 @@ def pause_arg(value: str) -> float | str:
         return value
 
 
-def resolve_pause(pause: Pause, speaker_id: int, edge: float | None = None) -> float | Callable[[str, random.Random],
-                                                                                              float]:
+def resolve_pause(pause: Pause, speaker_id: int, edge: float | None = None,
+                  context: bool = False) -> float | Callable[[str, random.Random], float]:
     """``pause``: seconds, a callable (e.g. a :class:`drifting_tts.prosody.PausePolicy`), or ``"punct"`` /
     ``"punct:<jitter>"``: the voice's measured policy (``PausePolicy.for_voice``, with the generated sentences' edge
     silence ``edge`` if known)."""
@@ -123,7 +123,7 @@ def resolve_pause(pause: Pause, speaker_id: int, edge: float | None = None) -> f
         raise ValueError(f"pause must be seconds, a callable or 'punct[:<jitter>]', got {pause!r}")
     from .prosody import PausePolicy
 
-    return PausePolicy.for_voice(speaker_id, jitter=float(jitter or 0.0), edge=edge)
+    return PausePolicy.for_voice(speaker_id, jitter=float(jitter or 0.0), edge=edge, context=context)
 
 
 def silence(pause: float | Callable[[str, random.Random], float], sentence: str, rng: random.Random) -> torch.Tensor:
@@ -547,7 +547,7 @@ class Synthesizer:
         the prosody predictor (default: the Synthesizer's); ``context``: see :class:`Synthesizer`."""
         spk, tempo = self._speaker(speaker)
         rhythm = self._rhythm(speaker)
-        pause = self._pause(pause, speaker)
+        pause = self._pause(pause, speaker, context)
         g = torch.Generator(device=self.device).manual_seed(seed)
         wavs, t_acoustic, t_vocoder = [], 0.0, 0.0
         rng = random.Random(seed)  # pause jitter only: the acoustic draws stay those of ``g``
@@ -593,7 +593,7 @@ class Synthesizer:
 
         spk, tempo = self._speaker(speaker)
         rhythm = self._rhythm(speaker)
-        pause = self._pause(pause, speaker)
+        pause = self._pause(pause, speaker, context)
         g = torch.Generator(device=self.device).manual_seed(seed)
         rng, previous = random.Random(seed), None
         for sentence, prev in self._units(text, paragraph, context):
@@ -619,7 +619,7 @@ class Synthesizer:
 
         spk, tempo = self._speaker(speaker)
         rhythm = self._rhythm(speaker)
-        pause = self._pause(pause, speaker)
+        pause = self._pause(pause, speaker, context)
         g = torch.Generator(device=self.device).manual_seed(seed)
         rng, previous = random.Random(seed), None
         voc, ctx = self.vocoder, self.vocoder.context
@@ -646,14 +646,16 @@ class Synthesizer:
                 yield vocode_window(voc, x, self.vocoder_graphs, sizes)[start * HOP_LENGTH: (start + n) * HOP_LENGTH
                                                                         ].cpu()
 
-    def _pause(self, pause: Pause | None, speaker: str | int):
+    def _pause(self, pause: Pause | None, speaker: str | int, context: bool | None = None):
         """The pause of a call: ``"punct"`` uses the prosody predictor's measured edge silence of this voice when its
-        durations are sampled (``ProsodyPredictor.pause_edges``), else the table's (v3.1's regressors)."""
+        durations are sampled (``ProsodyPredictor.pause_edges``), else the table's (v3.1's regressors), less the
+        leading silence that context removes (``context``, default: the Synthesizer's)."""
         spk_id = self.speaker_id(speaker)
         edge = None
         if self.prosody is not None and self.prosody_durations == "sampled":
             edge = self.prosody.pause_edges.get(spk_id)
-        return resolve_pause(self.pause if pause is None else pause, spk_id, edge)
+        ctx = self.context if context is None else context
+        return resolve_pause(self.pause if pause is None else pause, spk_id, edge, bool(ctx))
 
     def _sync(self) -> None:
         if self.device.startswith("cuda"):

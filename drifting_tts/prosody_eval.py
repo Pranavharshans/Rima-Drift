@@ -267,7 +267,7 @@ class Runner:
             if s.jitter is not None:
                 from .prosody import PausePolicy
 
-                pause = PausePolicy.for_voice(self.speaker, jitter=s.jitter)
+                pause = PausePolicy.for_voice(self.speaker, jitter=s.jitter, context=s.context)
             return synth(u.text, speaker=self.speaker, cfg_scale=cfg, temperature=temperature, seed=seed,
                          pause=pause, attn_window=s.attn_window, paragraph=s.paragraph, context=s.context)[0]
         durations, pitch = self.prosody(u, s)
