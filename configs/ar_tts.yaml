@@ -34,11 +34,12 @@ model:
 
 drift:
   crop_frames: 32          # shortest utterance used (frames)
-  gen_per_cond: 16         # head samples per step (the siblings of each drift problem); the recording is the positive
-  max_rows: 4096           # steps per batch that the head and the drift loss see (a random subset)
+  gen_per_cond: 32         # head samples per step (the siblings of each drift problem); the recording is the positive
+  max_rows: 2048           # steps per batch that the head and the drift loss see (a random subset); 32 x 2048: 17 GB
   tau_init: 1.0            # Kyutai's learned temperature (raw), one for all feature maps
   detail: true             # harmonic-detail features (each frame minus its frequency envelope)
   input_noise: 0.3         # teacher-forced inputs get noise of a random level up to this (normalised mel units)
+  cond_dropout: 0.0        # > 0: utterances trained without their text (the null condition), for cfg_scale != 1
   key_weights: {}
 
 loss:

@@ -92,3 +92,44 @@ def test_train_ar_cli_and_synthesis(tmp_path):
     wav, info = synth("merhaba dünya. nasılsın?", speaker=0, temperature=0.5, seed=1)
     assert wav.numel() > 0 and torch.isfinite(wav).all()
     assert torch.equal(synth("merhaba dünya. nasılsın?", speaker=0, temperature=0.5, seed=1)[0], wav)
+
+
+def test_fast_generator_matches_generate():
+    import pytest
+
+    from drifting_tts.models.ar import ARGenerator
+
+    m = _model()
+    cond, spk = torch.randn(2, 116, 29), torch.tensor([0, 2])
+    ref = m.generate(cond, spk, 0.7, torch.Generator().manual_seed(5))
+    fast = ARGenerator(m, max_steps=16, graphs=False)
+    torch.testing.assert_close(fast(cond, spk, 0.7, torch.Generator().manual_seed(5)), ref, atol=1e-4, rtol=1e-4)
+    torch.testing.assert_close(fast(cond, spk, 0.7, torch.Generator().manual_seed(5)), ref, atol=1e-4, rtol=1e-4)
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA graphs need a GPU")
+    mc = m.cuda()
+    ref = mc.generate(cond.cuda(), spk.cuda(), 0.7, torch.Generator(device="cuda").manual_seed(5))
+    g = ARGenerator(mc, max_steps=16)
+    for _ in range(2):  # the second call replays the captured graph on the stale caches of the first
+        out = g(cond.cuda(), spk.cuda(), 0.7, torch.Generator(device="cuda").manual_seed(5))
+        torch.testing.assert_close(out, ref, atol=1e-4, rtol=1e-4)
+
+
+def test_guidance_on_the_backbone_state():
+    from drifting_tts.models.ar import ARGenerator
+
+    m = _model()
+    cond, spk = torch.randn(2, 116, 21), torch.tensor([0, 2])
+    plain = m.generate(cond, spk, 0.5, torch.Generator().manual_seed(1))
+    torch.testing.assert_close(m.generate(cond, spk, 0.5, torch.Generator().manual_seed(1), cfg_scale=1.0), plain)
+    guided = m.generate(cond, spk, 0.5, torch.Generator().manual_seed(1), cfg_scale=2.0)
+    assert not torch.allclose(guided, plain)
+    fast = ARGenerator(m, max_steps=8, graphs=False)
+    torch.testing.assert_close(fast(cond, spk, 0.5, torch.Generator().manual_seed(1), 2.0), guided, atol=1e-4,
+                               rtol=1e-4)
+    y = torch.randn(2, 100, 24)
+    dropped = m.teacher_forced(m.pad_frames(cond), y, spk, drop=torch.tensor([True, False]))
+    null = m.teacher_forced(torch.zeros_like(m.pad_frames(cond)), y, spk)
+    full = m.teacher_forced(m.pad_frames(cond), y, spk)
+    torch.testing.assert_close(dropped[0], null[0])
+    torch.testing.assert_close(dropped[1], full[1])

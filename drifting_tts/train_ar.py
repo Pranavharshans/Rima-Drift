@@ -55,8 +55,10 @@ def training_step(model: ARDriftTTS, batch: dict, cfg: Config, device, tau: torc
     cond, y = model.pad_frames(model.frame_condition(h, mu, attn)), model.pad_frames(y)
     B = y.shape[0]
     noise = torch.rand(B, device=device) * float(dc.get("input_noise", 0.0))
+    p_drop = float(dc.get("cond_dropout", 0.0))  # the null condition of guidance
+    drop = torch.rand(B, device=device) < p_drop if p_drop > 0 else None
     with amp:
-        s = model.teacher_forced(cond, y, spk, noise)  # [B, S, dim]
+        s = model.teacher_forced(cond, y, spk, noise, drop)  # [B, S, dim]
     S = s.shape[1]
     valid = (torch.arange(S, device=device)[None] * k < y_len[:, None])  # steps that start inside the utterance
     idx = valid.flatten().nonzero()[:, 0]

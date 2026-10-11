@@ -328,7 +328,8 @@ class Synthesizer:
         from .fast import GraphedAcoustic, graphable
 
         self.acoustic = None
-        if getattr(self.model, "generator", None) is None:  # an ARDrift model: generated step by step, eagerly
+        if getattr(self.model, "generator", None) is None:  # an ARDrift model: one CUDA graph per generation step
+            self.model.enable_fast()
             return
         if not graphable(self.prosody, self.prosody_spread) or self.prosody_pitch is not None:
             warnings.warn("this prosody predictor runs eagerly: only the vocoder windows use CUDA graphs", stacklevel=3)
