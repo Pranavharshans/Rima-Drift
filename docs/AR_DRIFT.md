@@ -8,6 +8,7 @@ our data. This page is that model.
 - [Design](#design)
 - [Training](#training)
 - [Results](#results)
+- [New voices from 16 kHz recordings](#new-voices-from-16-khz-recordings)
 - [Commands](#commands)
 
 ## Design
@@ -123,6 +124,54 @@ Paired against v3.2 on the same 495 sentences (bootstrap 95% intervals):
   and its context.
 
 
+## New voices from 16 kHz recordings
+
+Six new voices (one speaker each, ~20 h of podcast speech per voice, 16 kHz) were added to the fine-tuned model. Two
+things had to be solved on the way, and both are reusable for any data of this kind.
+
+**Data.** `prepare` (24 kHz, BigVGAN mels), `score`; the fine-tune's filters (DNSMOS OVRL >= 3, speaker similarity
+>= 0.5, Whisper CER <= 0.15) keep 10-19 h per voice. The merged corpus carries their scores without `bw_hz`, so the
+bandwidth filter keeps applying to the base corpus only (`configs/ar_tts_voices.yaml`).
+
+**Clip boundaries.** The first model swallowed the first words of three voices (Freya-100 WER 12-14%, against 2-3% for
+the other three). Their clips were cut from continuous speech: before the first transcribed word, 0.24-0.42 s
+(median) of the previous sentence, which the alignment then gave to the first letters. The fix re-cuts every clip at
+its words: MMS forced alignment (`torchaudio.pipelines.MMS_FA`) of the normalised transcript, the clip trimmed to
+[first word - 0.08 s, last word + 0.12 s], clips whose first or last word aligns badly (mean probability < 0.3: the
+word is cut off) dropped (2-9%), and 10k more steps on the re-cut corpus (`configs/ar_tts_voices_fa.yaml`).
+
+**Bandwidth.** A 16 kHz recording has nothing above 8 kHz, so the voice is rendered dull next to the 24 kHz ones.
+`drifting-tts train-bwe` trains a mel bandwidth extension (`drifting_tts/bwe.py`, 3.8 M parameters, dilated
+convolutions over time, 20k steps, 25 min) on the full-band corpus, each clip low-passed as a 16 kHz source; at
+inference it fills the bins above 7.6 kHz of the generated mel and keeps the ones below
+(`extend_vocoder(vocoder, "bwe.pt")`). On 64 held-out full-band clips through Vocos v2:
+
+| mel | log-spectral distance, full band | 8-11.5 kHz | energy above 8 kHz |
+|---|---|---|---|
+| the recording's (resynthesis) | 8.46 dB | 8.80 dB | 0.90 |
+| low-passed as a 16 kHz source | 16.34 dB | 25.06 dB | 0.01 |
+| low-passed, then extended | **9.14 dB** | **10.30 dB** | 0.69 |
+
+**Results** (Freya-100, T 0.5, no guidance; SIM: WavLM-ECAPA to the centroid of 50 of the voice's own recordings;
+pitch from the recordings' median F0; the studio voice as the regression check):
+
+| voice | pitch | first model (20k), WER | **re-cut (+10k)**, WER / CER | UTMOSv2 | SIM |
+|---|---|---|---|---|---|
+| new 1 | 157 Hz | 13.39% | **1.98%** / 0.40% | 2.224 | 0.676 |
+| new 2 | 192 Hz | 12.29% | **2.63%** / 0.56% | 2.330 | 0.720 |
+| new 3 | 193 Hz | 13.83% | **4.28%** / 1.06% | 2.176 | 0.681 |
+| new 4 | 196 Hz | 2.96% | 3.29% / 0.82% | 2.330 | 0.669 |
+| new 5 | 113 Hz | 2.96% | 1.54% / 0.32% | 2.538 | 0.717 |
+| new 6 | 105 Hz | 2.31% | 3.07% / 0.62% | 2.237 | 0.776 |
+| studio (722) | 103 Hz | 0.55% | 0.33% / 0.10% | 2.953 | 0.911 |
+
+- **The re-cut fixed the swallowed words:** WER 12-14% -> 2.0-4.3% for the three voices; the other three stay at
+  1.5-3.3% (Freya-100 has ~600 words: one error is 0.17 points).
+- **Lower UTMOSv2 than the studio voice (2.18-2.54 against 2.95),** largely the recordings' own quality: their DNSMOS
+  OVRL is ~3.0, the outputs' 2.90-3.25. UTMOSv2, DNSMOS and SIM run at 16 kHz and do not see the bandwidth extension.
+- **The existing voices are kept** (studio 0.33% / 2.953 against 0.55% / 3.026 before).
+- In a private test Space only (`space_voices/`, `scripts/deploy_voices_space.sh`, which refuses a public Space).
+
 ## Commands
 
 ```bash
@@ -131,10 +180,22 @@ drifting-tts train-ar --config configs/ar_tts_ft.yaml --workdir runs/ar_ft \
     train.init_from=runs/ar_pre/model_ema_60000.pt                                    # + the studio voice
 drifting-tts calibrate-durations --model runs/ar_ft/model_ema.pt --speakers 722 389 323
 drifting-tts benchmark --model runs/ar_ft/model_ema.pt --vocoder vocos-v2 --num 100 --speaker studio \
-    --temperature 0.5 --cfg 1.5
+    --temperature 0.5 --cfg 1 --pause punct
+
+# new voices from 16 kHz recordings: prepare + score each (data/voiceN), re-cut at the words, merge (the voices'
+# scores carried over by src_i, without bw_hz), fine-tune, then the bandwidth extension
+python scripts/align_clips.py data/voice1 data/voice2                                   # -> data/voice1_fa, ...
+drifting-tts merge-data --out data/tr12_eleven_podfa data/tr12_eleven data/voice1_fa data/voice2_fa
+drifting-tts train-ar --config configs/ar_tts_voices.yaml --workdir runs/ar_voices
+drifting-tts train-ar --config configs/ar_tts_voices_fa.yaml --workdir runs/ar_voices_fa
+drifting-tts train-bwe --data data/tr12_eleven --workdir runs/bwe
+scripts/deploy_voices_space.sh <private space> <exported model> runs/bwe/bwe.pt voices.json
 ```
 
 ```python
+from drifting_tts.bwe import extend_vocoder
+
 tts = Synthesizer("runs/ar_ft/model_ema.pt", "cuda", vocoder="vocos-v2", fast=True)
-wav, _ = tts("Merhaba, nasılsınız?", speaker="studio", temperature=0.5, cfg_scale=1.5)
+wav, _ = tts("Merhaba, nasılsınız?", speaker="studio", temperature=0.5, cfg_scale=1.0)
+wide = tts.variant(vocoder=extend_vocoder(tts.vocoder, "runs/bwe/bwe.pt"))  # for a voice from 16 kHz recordings
 ```

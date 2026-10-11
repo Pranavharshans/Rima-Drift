@@ -1,0 +1,14 @@
+# ARDrift with six new voices (#42 follow-up): the studio fine-tune (configs/ar_tts_ft.yaml, 40k) continued on the
+# base corpus plus six single-speaker podcast voices, ~20 h each (data/pod1..6, 16 kHz recordings resampled to
+# 24 kHz by `prepare`; merged as data/tr12_eleven_pod, their scores without bw_hz so the bandwidth filter keeps
+# applying to the base corpus only). The speaker table grows by six rows. Their mels are empty above ~8 kHz: the
+# mel bandwidth extension (`drifting-tts train-bwe`, drifting_tts/bwe.py) fills that band at inference.
+base: ar_tts_ft.yaml
+
+data:
+  root: data/tr12_eleven_pod
+
+train:
+  init_from: runs/ar_ft/model_ema.pt
+  steps: 40000
+  warmup: 1000
