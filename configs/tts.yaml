@@ -62,7 +62,8 @@ drift:
   feature_dtype: bf16      # fp32: frozen MAE features in fp32 / TF32 instead of bf16 autocast
   max_locations: null      # e.g. 1024: random subset of locations per step for larger maps (unbiased, cheaper)
   detach_cond: false
-  delta:                   # frame-to-frame change features (drifting_tts.models.mae.delta_features; latents, #27)
+  delta:                   # frame-to-frame change features (drifting_tts.models.mae.delta_features; latents, #27;
+                           # tried, no gain: docs/LATENTS.md)
     stride: 0              # > 0 turns them on: frames per VAE frame (extract-latents --repeat, e.g. 4)
     windows: [8]           # delta_std<k>: per-channel std of the changes over k VAE frames
     raw_patch: 0           # > 0: delta_patch<k>, the raw changes of k VAE frames per location

@@ -244,6 +244,8 @@ v3.1.
 
 Open directions:
 - **A decaying learning rate**, or a larger drift batch, in case the constant rate keeps the latent model from settling.
+  Tried: a cosine schedule stops the decline but does not lift the plateau
+  ([below](#generator-side-a-decaying-learning-rate-and-frame-change-features-17-27)).
 - **Fine-tuning the VoxCPM2 decoder on generated latents**, the latent counterpart of the GTA vocoder fine-tune: see
   [below](#fine-tuning-the-voxcpm2-decoder-on-generated-latents-27).
 - **Kernel features.** The latent MAE may be the bottleneck. Mel-MAE features of the decoded audio are an
@@ -572,6 +574,82 @@ Open issues:
   latents themselves.
 - **Upper band.** The decoder is meant for 24 kHz output; its 16–24 kHz band is not trained.
 - **UTMOSv2 is only a relative proxy.** It is trained on English, so listen before choosing a checkpoint.
+
+## Generator side: a decaying learning rate and frame-change features (#17, #27)
+
+The fine-tuned decoders fixed the noise; what was left open on the generator side was (a) whether the latent model
+improves with longer training under a decaying learning rate (the 50k-step run at a constant rate got worse) and
+(b) whether the generator can be made to produce the frame-level detail the decoders need (#27: generated latents
+change by 0.62 per frame against 0.98 in recordings).
+
+**Runs** (VoxCPM2 latents, the 10k pilot's recipe and data, one RTX 5090 shared by two runs at ~4 it/s each):
+- `cosine 30k`: 30k steps, the learning rate decays to 5% with a cosine after the 5k-step warm-up.
+- `delta 30k`: the same plus frame-change features in the drift loss (`drift.delta`, `delta_features`): the 4 copies
+  of each VAE frame averaged back, the per-channel std of the first differences over the window (`delta_std`) and
+  over 8-frame windows (`delta_std8`), and the raw differences, 4 frames per location (`delta_patch4`), weighted
+  ×4 (`key_weights: {"delta_*": 4}`; 3 of 73 feature maps).
+- `std-only 10k`: the pilot's recipe (constant rate, 10k steps) with only the two std features, ×4.
+
+**Smoothness of the generated latents** (`scripts/latent_smoothness.py`: the 100 held-out `val` texts of the studio
+voice, T 0.3, α 2, against their own recordings; normalised units at the native 25 Hz):
+
+| model | frame-to-frame change (recordings 1.021) | ratio | per-channel std (0.994) | ratio |
+|---|---:|---:|---:|---:|
+| pilot 10k (constant rate) | 0.600 | 0.58 | 0.672 | 0.67 |
+| cosine 30k, at 10k / 20k / 30k | 0.614 / 0.613 / 0.632 | 0.60 / 0.60 / 0.62 | 0.682 / 0.663 / 0.673 | 0.69 / 0.67 / 0.68 |
+| delta 30k, at 10k / 20k / 30k | 0.594 / 0.567 / 0.581 | 0.58 / 0.55 / 0.56 | 0.646 / 0.632 / 0.642 | 0.65 / 0.63 / 0.64 |
+| std-only 10k (constant rate) | 0.593 | 0.58 | 0.641 | 0.64 |
+
+The noise temperature explains part of the smoothness, not most of it. The pilot's change ratio is 0.47 at T 0,
+0.58 at T 0.3, 0.67 at T 0.7 and 0.69 at T 1 (60 sentences): even at the training noise level the generator makes
+about two thirds of the recordings' frame-level movement.
+
+**Freya-100** (studio voice, T 0.3, α 2, Whisper large-v3 on 8 kHz, UTMOSv2, DNSMOS OVRL of the 100 outputs):
+
+| model | decoder | WER [95% CI] | CER | UTMOSv2 [95% CI] | DNSMOS OVRL |
+|---|---|---|---|---|---|
+| pilot 10k | fine-tuned 35k (published) | 1.87% [0.97, 2.96] | 0.43% | 2.530 [2.479, 2.583] | 3.25 |
+| cosine 30k | fine-tuned 35k | 1.65% [0.76, 2.69] | 0.40% | 2.284 [2.234, 2.333] | 3.12 |
+| delta 30k | fine-tuned 35k | 3.73% [2.30, 5.34] | 1.22% | 1.971 [1.927, 2.012] | 2.45 |
+| std-only 10k | fine-tuned 35k | 3.73% [2.46, 5.06] | 0.88% | 2.111 [2.063, 2.163] | 3.03 |
+| pilot 10k | released | 4.94% [3.23, 6.89] | 1.39% | 2.052 [2.007, 2.100] | 1.49 |
+| cosine 30k | released | 5.05% [3.22, 7.16] | 1.57% | 2.118 [2.072, 2.166] | 1.41 |
+| delta 30k | released | 7.46% [5.52, 9.54] | 2.10% | 2.127 [2.077, 2.179] | 1.39 |
+| std-only 10k | released | 5.60% [4.03, 7.27] | 1.60% | 2.270 [2.226, 2.318] | 1.52 |
+
+The fine-tuned decoder was trained on the pilot's own generated latents, so the rows with the released decoder are
+the fair comparison between generators; those with the fine-tuned decoder show what a user would get without
+fine-tuning the decoder again.
+
+- **A decaying rate stops the decline but does not lift the plateau.** Cosine 30k is where the pilot was at 10k on
+  every column with the released decoder (WER 5.05% against 4.94%, UTMOSv2 2.12 against 2.05, DNSMOS 1.41 against
+  1.49), where the 50k run at a constant rate had fallen to 7.57%. Its latents are a little less smooth (change ratio
+  0.62 against 0.58). The latent objective plateaus by 10k steps whatever the schedule.
+- **Frame-change features do not make the latents rougher.** The delta run's latents are smoother than the pilot's
+  (0.56), not rougher, and every Freya column drops (WER 7.46% with the released decoder). A suspect was the raw
+  per-location changes: with one recording per text, attracting each sample to the recording's exact frame-to-frame
+  changes acts like a regression to their mean, zero. Without them (std-only, the pilot's recipe) the change ratio
+  stays at the pilot's 0.58 and the channel spread drops (0.64), UTMOSv2 with the released decoder rises a little
+  (2.27 against 2.05) and WER gets worse (5.60% against 4.94%; 3.73% against 1.87% with the fine-tuned decoder).
+  Matching the roughness statistic is not enough for the generator to produce detail it cannot predict from the
+  text.
+
+**Conclusions.**
+- **#17 (train the winner fully):** the latent pilots learn to speak faster than mels, but no latent model beats the
+  fully trained mel model: v3.1 + `bigvgan-v2-ft` scores 0.66% / 2.934 on the same protocol, the best latent system
+  (DAC-VAE with its fine-tuned decoder) 1.32% / 2.710, and longer latent training does not close the gap (constant
+  rate: worse; decaying rate: no better). The mel model stays the release model; the latent code and models remain
+  available as experiments.
+- **#27 (generator side):** the fine-tuned decoders are the fix for the noise. Neither a longer schedule nor
+  frame-change features make the generator produce the detail the released decoder needs.
+
+```bash
+drifting-tts train --config configs/tts_latent.yaml --workdir runs/tts_voxcpm2_cosine train.steps=30000 \
+    train.schedule=cosine
+drifting-tts train --config configs/tts_latent.yaml --workdir runs/tts_voxcpm2_delta drift.delta.stride=4 \
+    drift.delta.raw_patch=4 'drift.key_weights={"delta_*": 4.0}'
+python scripts/latent_smoothness.py --model runs/tts_voxcpm2_cosine/model_ema.pt --num 100
+```
 
 ## All systems on one protocol
 

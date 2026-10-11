@@ -56,6 +56,7 @@ is the index and the place to start before planning new work.
 | latents | VoxCPM2 / DAC-VAE latent TTS (10k pilots) | speaks earlier than mels, but noisy with the released decoders | partly | [LATENTS.md](LATENTS.md#tts-pilots-17) |
 | latents | longer latent training (10k → 50k) | worse (WER 4.94% → 7.57%) | ❌ | [LATENTS.md](LATENTS.md#longer-training-and-the-released-model) |
 | latents | fine-tuning the VAE decoder on generated latents | **the fix for the noise**: DAC-VAE WER 9.55% → 1.32%, UTMOSv2 1.84 → 2.71 | ✅ on the Hub | [LATENTS.md](LATENTS.md#fine-tuning-the-dac-vae-decoder-on-generated-latents-32) |
+| latents | generator side (#17, #27): a cosine-decaying LR over 30k steps; frame-change features in the drift loss (raw + std, or std only) | cosine: back to the 10k pilot's level (Freya-100, released decoder: WER 5.05% vs 4.94%), no gain; frame-change features: latents no rougher (change ratio 0.56–0.58 vs 0.58), WER worse (7.46% / 5.60%) | ❌ (`drift.delta` kept, off); the mel model stays the release model | [LATENTS.md](LATENTS.md#generator-side-a-decaying-learning-rate-and-frame-change-features-17-27) |
 | acoustic model | SLM (WavLM) adversarial term on the acoustic model, fine-tuned from v3.1 against a control without it (#41) | no measurable gain at the tested strength (Freya-100 UTMOSv2 SLM − control −0.007 / +0.065 / −0.000 at 2k / 6k / 12k); real recordings as positives let the discriminator win on Vocos artefacts | opt-in (`slm.enabled`), not used | [TRAINING.md](TRAINING.md#ssl-adversarial-fine-tuning-experimental-41) |
 | prosody | temperature / CFG as prosody knobs | no effect on intonation or rhythm | – | [§5](#5-robotic-prosody-diagnosis-and-research) |
 | prosody | oracle prosody A/B: ground-truth token pitch / MAS durations into the frozen DiT | **the token pitch predictor is the bottleneck**: DTW F0 r 0.61 → 0.79 (copy-synthesis ceiling 0.83); predicted pitch is 26% flatter than its targets, durations 41% | – (diagnosis) | [PROSODY.md](PROSODY.md#oracle-prosody-ab-studio-voice) |
@@ -392,9 +393,9 @@ model (CRPS), but it is 10–14% flatter and needs 8 network evaluations. BERTur
 | #40 | context: word-level features, paragraph mode |
 | #41 | SSL (WavLM) adversarial term on the acoustic model |
 | #42 | strategic: Kyutai's Pocket TTS recipe on Turkish |
-| #27 | latent models: generator-side fixes (over-smooth latents, flat prosody) |
-| #17, #19 | latent TTS and the vocoder / latent tracking issue |
-| #8 | small vocoders on phones: Mac / iPhone measurements of the MLX ports |
+| #27 | latent models: generator-side fixes tried (decaying LR, frame-change features): no gain; the decoder fine-tune is the fix |
+| #17, #19 | latent TTS: no latent model beats the fully trained mel model; the tracking issue is complete |
+| #8 | small vocoders on phones: Vocos v2 (ONNX, MLX, CPU latency); device timings belong to drifting-tts-swift |
 
 Suggested order: #38 → #39 → #40 / #41. #42 is a separate strategic decision. A native-listener CMOS or MUSHRA
 test should gate every naturalness claim.
