@@ -226,6 +226,30 @@ The control's own snapshots vary by ±0.03 UTMOSv2. Word errors are 5–9 of 911
 At this strength the adversary changes nothing that Freya-100's judges can see. The push it applies is about a
 quarter of the drift's.
 
+**Retry with a 5× larger cap (the last open item of #41).** The same fine-tune (`real: vocoded`, 10 × 16, 12k steps
+from v3.1, `slm.weight` 0.01) with `slm.grad_clip` 0.05 instead of 0.01, so the adversarial gradient on the judged
+crops is no longer pinned at the cap (the drift's is ~0.03). Same control, vocoder and protocol as above.
+
+- **Training.** The cap now binds in 16–24% of the steps (pilot: > 99%); the gradient norm before the cap is
+  0.035–0.041, so the push is about 1.2–1.4× the drift's. The discriminator gap widens slowly (D(real) / D(fake)
+  0.62 / 0.37 over 1–2k steps, 0.67 / 0.33 over 8–12k). Drift, prior, τ (0.065) and `across_sample_std` (0.21)
+  follow the control. 2.7 it/s on a GPU shared with evaluations, 19 GB.
+
+| model | WER | CER | UTMOSv2 | DNSMOS OVRL | F0 micro-variation | periodicity |
+|---|---|---|---|---|---|---|
+| control, 2k / 6k / 12k | 0.55 / 0.55 / 0.99% | 0.13 / 0.14 / 0.19% | 2.935 / 2.887 / 2.942 | 3.355 / 3.342 / 3.350 | 0.388 / 0.394 / 0.395 | 0.710 / 0.708 / 0.709 |
+| SLM, cap 0.01, 2k / 6k / 12k | 0.55 / 0.66 / 0.77% | 0.14 / 0.16 / 0.16% | 2.928 / 2.951 / 2.942 | 3.354 / 3.353 / 3.347 | 0.391 / 0.400 / 0.387 | 0.708 / 0.709 / 0.709 |
+| **SLM, cap 0.05, 2k / 6k / 12k** | 0.55 / 0.66 / 0.99% | 0.13 / 0.16 / 0.19% | 2.925 / 2.931 / 2.904 | 3.352 / 3.349 / 3.352 | 0.392 / 0.388 / 0.395 | 0.709 / 0.709 / 0.708 |
+
+SLM (cap 0.05) minus control on the same sentences and seeds, UTMOSv2 [95% bootstrap CI]: 2k −0.010
+[−0.051, +0.034], 6k +0.044 [−0.002, +0.088], 12k −0.038 [−0.082, +0.006]; DNSMOS OVRL within ±0.007; the same word
+errors (5 / 6 / 9 against 5 / 5 / 9 of 911).
+
+**Conclusion (#41).** A WavLM adversary on vocoded crops does not measurably improve the acoustic model at either
+strength. With the frozen Vocos in the loop the discriminator mostly sees vocoder texture (with `real: audio` it wins
+on it at once), and the drift field already matches what WavLM features can tell apart in a one-step DiT that is
+conditioned on the ground-truth prosody. `slm.enabled` stays in the code as an experimental, opt-in term.
+
 ## What to look at while training
 
 - **`train/centroid_mse`** should keep decreasing.
