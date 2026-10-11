@@ -1,7 +1,7 @@
 import torch
 
 from drifting_tts.synthesize import split_sentences
-from drifting_tts.text import normalize
+from drifting_tts.text import group_sentences, normalize
 
 
 def test_split_sentences():
@@ -14,6 +14,14 @@ def test_split_long_sentence():
     parts = split_sentences(words, max_chars=100)
     assert all(len(p) <= 101 for p in parts)
     assert " ".join(parts) == words
+
+
+def test_group_sentences_joins_neighbours_up_to_the_limit():
+    sentences = ["bir iki üç.", "dört beş.", "altı yedi sekiz dokuz on.", "x" * 40 + "."]
+    assert group_sentences(sentences, 25) == ["bir iki üç. dört beş.", "altı yedi sekiz dokuz on.", "x" * 40 + "."]
+    assert group_sentences(sentences, 1000) == [" ".join(sentences)]
+    assert group_sentences(sentences, 5) == sentences  # longer sentences stay alone
+    assert group_sentences([], 100) == []
 
 
 def _tiny_tts():

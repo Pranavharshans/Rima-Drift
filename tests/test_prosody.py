@@ -210,3 +210,15 @@ def test_parse_system():
     for bad in ("oracle-everything", "onepass@beam4", "recording@cfg1"):
         with pytest.raises(ValueError):
             parse_system(bad)
+
+
+def test_pause_policy_with_context_inserts_the_missing_leading_silence():
+    from drifting_tts.prosody import CONTEXT_LEAD, PausePolicy
+
+    plain, ctx = PausePolicy.for_voice(722), PausePolicy.for_voice(722, context=True)
+    assert ctx.edge == pytest.approx(plain.edge - CONTEXT_LEAD[722])
+    gap = plain.gaps["."][0]  # the inserted silence is clamped at 0 (the studio voice's edge exceeds its gap)
+    assert plain("bir cümle.") == pytest.approx(max(0.0, gap - plain.edge))
+    assert ctx("bir cümle.") == pytest.approx(max(0.0, gap - plain.edge + CONTEXT_LEAD[722]))
+    assert ctx("bir cümle.") > plain("bir cümle.")
+    assert PausePolicy.for_voice(5, context=True).edge == pytest.approx(PausePolicy.for_voice(5).edge - 0.07)

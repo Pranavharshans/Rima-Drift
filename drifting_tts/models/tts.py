@@ -73,12 +73,15 @@ class DriftingTTS(nn.Module):
     @torch.no_grad()
     def aligned_condition(self, text: Tensor, text_len: Tensor, spk: Tensor, length_scale: float = 1.0,
                           pitch_shift: float = 0.0, durations: Tensor | None = None,
-                          pitch: Tensor | None = None) -> tuple[Tensor, Tensor]:
+                          pitch: Tensor | None = None, context: int = 0) -> tuple[Tensor, Tensor]:
         """The text half of :meth:`synthesize`: the generator's aligned condition ``[B, n_mels + d, T]`` and the mel
         lengths ``[B]`` (same arguments)."""
         h, mu, logw, x_mask = self.encoder(text, text_len, spk)
         if self.pitch_enabled:
             h, _ = self.pitch_condition(h, x_mask, spk, pitch, pitch_shift=pitch_shift)
+        if context:  # the leading tokens only condition the others (the text encoder and pitch saw them)
+            h, mu, logw, x_mask = (t[..., context:] for t in (h, mu, logw, x_mask))
+            durations = None if durations is None else durations[:, context:]
         if durations is None:
             attn, y_len = durations_to_alignment(logw, x_mask, length_scale)
         else:
@@ -96,13 +99,17 @@ class DriftingTTS(nn.Module):
                    temperature: float = 1.0, length_scale: float = 1.0, noise_labels: Tensor | None = None,
                    generator: torch.Generator | None = None, attn_window: int | None = None,
                    pitch_shift: float = 0.0, steps: int | None = None, durations: Tensor | None = None,
-                   pitch: Tensor | None = None) -> tuple[Tensor, Tensor]:
+                   pitch: Tensor | None = None, context: int = 0) -> tuple[Tensor, Tensor]:
         """Generate mels with ``steps`` generator evaluations (default: the trained number, 1 = one-step).
 
         ``z`` and the style codes both come from ``generator``. Returns normalised mels and lengths.
         Prosody overrides (:mod:`drifting_tts.prosody`): ``durations`` (frames per token ``[B, N]``, used as they are,
-        without ``length_scale``) and ``pitch`` (normalised token log-F0 ``[B, 1, N]``) replace the predicted ones."""
-        cond, y_len = self.aligned_condition(text, text_len, spk, length_scale, pitch_shift, durations, pitch)
+        without ``length_scale``) and ``pitch`` (normalised token log-F0 ``[B, 1, N]``) replace the predicted ones.
+        ``context``: the first ``context`` tokens of ``text`` are left context (e.g. the previous sentence): the text
+        encoder and the pitch see them, but only the rest is generated, as the DiT was trained on crops of longer
+        utterances (``durations`` and ``pitch`` cover all tokens)."""
+        cond, y_len = self.aligned_condition(text, text_len, spk, length_scale, pitch_shift, durations, pitch,
+                                             context)
         z = torch.randn(cond.shape[0], self.n_mels, cond.shape[-1], device=cond.device, generator=generator)
         mask = sequence_mask(y_len, cond.shape[-1])
         alpha = torch.full((text.shape[0],), float(cfg_scale), device=text.device)

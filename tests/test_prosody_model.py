@@ -302,3 +302,21 @@ def test_boundary_tokens_and_the_boundary_branch():
     a, b = net(cond, torch.ones(1, 1, N), z, g), net(other, torch.ones(1, 1, N), z, g)
     bnd = boundary_tokens(ids)[0]
     assert torch.equal(a[0, 0, ~bnd], b[0, 0, ~bnd]) and not torch.allclose(a[0, 0, bnd], b[0, 0, bnd])
+
+
+def test_pause_durations_sample_only_the_tokens_between_words():
+    """``prosody_durations="pauses"``: the tokens between words keep the sampled frames, the letters get the
+    regressors' ``ceil(exp(logw) * scale)``, as without a predictor."""
+    from drifting_tts.models.prosody_net import pause_durations
+
+    tts, pred = _tiny_pitch_tts(), _tiny_pred()
+    ids, lens, _ = _batch(["merhaba dünya, bugün nasılsın? iyiyim."])
+    spk = torch.tensor([1])
+    sampled, _ = pred.predict(tts, ids, lens, spk, 0.7, 1.1, generator=torch.Generator().manual_seed(0))
+    mixed, pitch = pred.predict(tts, ids, lens, spk, 0.7, 1.1, generator=torch.Generator().manual_seed(0),
+                                regressor_scale=0.8)
+    _, _, logw, x_mask = tts.encoder(ids, lens, spk)
+    gap = boundary_tokens(ids)
+    torch.testing.assert_close(mixed[gap], sampled[gap])
+    torch.testing.assert_close(mixed[~gap], torch.ceil(torch.exp(logw[:, 0]) * 0.8)[~gap])
+    torch.testing.assert_close(pause_durations(sampled, logw, ids, x_mask, 0.8), mixed)

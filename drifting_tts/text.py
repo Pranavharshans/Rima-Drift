@@ -240,6 +240,20 @@ def ids_to_text(ids: list[int]) -> str:
     return "".join(SYMBOLS[i] for i in ids if i not in (PAD_ID, BLANK_ID))
 
 
+def group_sentences(sentences: list[str], max_chars: int = 180) -> list[str]:
+    """Paragraph mode: consecutive sentences joined (with a space) into units of at most ``max_chars`` characters, each
+    synthesised in one pass. The model is trained on utterances of up to 16 s, most of several sentences, so in one
+    pass it renders the gaps and the intonation across the sentences' boundaries itself. A sentence longer than
+    ``max_chars`` stays alone."""
+    out: list[str] = []
+    for s in sentences:
+        if out and len(out[-1]) + 1 + len(s) <= max_chars:
+            out[-1] = f"{out[-1]} {s}"
+        else:
+            out.append(s)
+    return out
+
+
 def split_sentences(text: str, max_chars: int = 180) -> list[str]:
     """Split normalised text into sentences (the generator is trained on <= 16 s utterances)."""
     parts = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]

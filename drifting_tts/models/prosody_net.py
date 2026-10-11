@@ -99,6 +99,16 @@ def sentence_tokens(ids: Tensor, lengths: Tensor, boundary: bool = False) -> Ten
     return out.transpose(1, 2)
 
 
+def pause_durations(sampled: Tensor, logw: Tensor, ids: Tensor, x_mask: Tensor,
+                    regressor_scale: float | Tensor) -> Tensor:
+    """``prosody_durations="pauses"``: the sampled frames ``[B, N]`` of the tokens between words
+    (:func:`boundary_tokens`: the pauses and phrase breaks), the regressors' of the letters,
+    ``ceil(exp(logw) * regressor_scale)`` as in :func:`~drifting_tts.models.text_encoder.durations_to_alignment`.
+    ``logw`` ``[B, 1, N]``, ``x_mask`` ``[B, 1, N]``."""
+    letters = torch.ceil(torch.exp(logw[:, 0]) * regressor_scale)
+    return torch.where(boundary_tokens(ids), sampled, letters) * x_mask[:, 0]
+
+
 def floor_letters(frames: Tensor, ids: Tensor, min_frames: float = 0.0, rel: float = 0.0,
                   ref_frames: Tensor | None = None) -> Tensor:
     """Raise short letters: a letter (a character token and the blank after it) gets at least ``min_frames`` frames
@@ -438,7 +448,8 @@ class ProsodyPredictor(nn.Module):
                 length_scale: float | Tensor = 1.0, generator: torch.Generator | None = None,
                 spread: float = 1.0, duration_temperature: float | None = None,
                 duration_speaker: Tensor | None = None, edge_scale: float | Tensor | None = None,
-                min_letter_frames: float = 0.0, rel_letter_floor: float = 0.0) -> tuple[Tensor, Tensor]:
+                min_letter_frames: float = 0.0, rel_letter_floor: float = 0.0,
+                regressor_scale: float | Tensor | None = None) -> tuple[Tensor, Tensor]:
         """Sample frames per token ``[B, N]`` and token pitch ``[B, 1, N]`` for ``tts`` (its frozen encoder and
         regressors give the condition); pass them to :meth:`DriftingTTS.synthesize` as ``durations`` / ``pitch``.
         ``temperature`` / ``spread``: see :meth:`sample`. ``duration_temperature``: the noise temperature of the
@@ -449,7 +460,8 @@ class ProsodyPredictor(nn.Module):
         ``edge_scale`` (with ``duration_speaker``): the sentence's edges (:func:`edge_tokens`) keep the voice's own
         regressor durations, ``ceil(exp(logw) * edge_scale)``: a voice's generator learned its own sentence starts
         and ends (the female recordings, for one, start abruptly). ``min_letter_frames`` / ``rel_letter_floor``:
-        :func:`floor_letters`, relative to the regressors' durations (off by default)."""
+        :func:`floor_letters`, relative to the regressors' durations (off by default). ``regressor_scale``: only the
+        pauses are sampled (:func:`pause_durations`): the letters keep the regressors' durations at this scale."""
         h, _, logw, x_mask = tts.encoder(text, text_len, spk)
         words, sents = self.word_tokens(text, text_len), self.sent_tokens(text, text_len)
         cond, base = self.condition(tts, h, x_mask, spk, logw, self.stats, words, sents)
@@ -467,6 +479,8 @@ class ProsodyPredictor(nn.Module):
         if min_letter_frames or rel_letter_floor:
             ref = torch.exp(logw[:, 0]) * length_scale
             frames = floor_letters(frames, text, min_letter_frames, rel_letter_floor, ref) * x_mask[:, 0]
+        if regressor_scale is not None:
+            frames = pause_durations(frames, logw, text, x_mask, regressor_scale)
         return frames, pitch
 
     @classmethod

@@ -449,6 +449,10 @@ PAUSES: dict[int | str, dict] = {
     323: {"edge": 0.070, ".": (0.223, 0.328), ",": (0.126, 0.174)},  # female
     "base": {"edge": 0.123, ".": (0.234, 0.329), "?": (0.238, 0.326), ",": (0.159, 0.190)},  # corpus without 722
 }
+# Context (``Synthesizer(context=True)``): a sentence generated after the text before it starts with less silence,
+# its leading blank no longer being a sentence start. Leading silence alone minus with the previous sentence as context
+# (seconds; v3.2, the regressors' durations, T 0.3, α 2, 50 sentence pairs per voice); the edge shrinks by this much.
+CONTEXT_LEAD: dict[int | str, float] = {722: 0.072, 389: 0.070, 323: 0.013, "base": 0.07}
 
 
 @dataclass
@@ -466,13 +470,20 @@ class PausePolicy:
     jitter: float = 0.0
 
     @classmethod
-    def for_voice(cls, speaker: int | str | None = None, jitter: float = 0.0, edge: float | None = None) -> PausePolicy:
+    def for_voice(cls, speaker: int | str | None = None, jitter: float = 0.0, edge: float | None = None,
+                  context: bool = False) -> PausePolicy:
         """The measured policy of a speaker ID (else of the multi-speaker corpus, ``base``). ``edge``: the edge
         silence of the pipeline that generates the sentences, if it differs from the table's (measured with v3.1's
-        regressors; a prosody predictor's sampled durations leave other edges, ``ProsodyPredictor.pause_edges``)."""
-        table = dict(PAUSES.get(int(speaker) if str(speaker).isdigit() else speaker, PAUSES["base"]))
+        regressors; a prosody predictor's sampled durations leave other edges, ``ProsodyPredictor.pause_edges``).
+        ``context``: the sentences are generated with the text before them as context, so they start with less
+        silence (:data:`CONTEXT_LEAD`)."""
+        key = int(speaker) if str(speaker).isdigit() else speaker
+        table = dict(PAUSES.get(key, PAUSES["base"]))
         table_edge = table.pop("edge")
-        return cls(table, table_edge if edge is None else edge, jitter)
+        edge = table_edge if edge is None else edge
+        if context:
+            edge = max(0.0, edge - CONTEXT_LEAD.get(key, CONTEXT_LEAD["base"]))
+        return cls(table, edge, jitter)
 
     def __call__(self, sentence: str, rng: random.Random | None = None) -> float:
         mark = sentence.rstrip()[-1:]

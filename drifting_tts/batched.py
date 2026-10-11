@@ -32,7 +32,7 @@ from .alignment import sequence_mask
 from .audio import HOP_LENGTH, N_FFT
 from .chunked import Chunking, _take, autocast, to_device  # noqa: F401 (_take re-exported)
 from .noise import DiTNoise, Philox, philox_normal, philox_randint
-from .text import normalize, split_sentences, text_to_ids
+from .text import text_to_ids
 
 
 @dataclass(frozen=True)
@@ -295,7 +295,7 @@ def batchable(synth) -> bool:
     from .fast import graphable
 
     return (graphable(synth.prosody, synth.prosody_spread) and not synth._duration_row()
-            and getattr(synth, "prosody_pitch", None) is None)
+            and getattr(synth, "prosody_pitch", None) is None and synth.prosody_durations != "pauses")
 
 
 def _batch_args(synth, sentences: list[str], speaker, prosody_temperature: float | None) -> tuple:
@@ -531,7 +531,7 @@ def stream_batched(synth, texts: list[str], speaker=None, cfg_scale: float = 1.0
     for group in length_groups(est, sv.buckets, sv.min_bucket):
         kept = []
         for i in group:
-            reqs[i]["sentences"] = split_sentences(normalize(reqs[i]["text"]))
+            reqs[i]["sentences"] = synth.units(reqs[i]["text"])
             if reqs[i]["sentences"]:
                 kept.append(i)
         if not kept:

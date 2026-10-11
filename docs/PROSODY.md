@@ -302,6 +302,89 @@ voice's have several sentences):
   (CER* 0.38% against 0.50%). Paragraph mode is in the training distribution and costs nothing here; its weak spot
   is the near-constant pause at every mark (0.46 pauses ≥ 100 ms per utterance against 1.40).
 
+### In the pipeline: paragraph mode, context and sampled pauses (#40)
+
+Three opt-in options of `Synthesizer` (and `drifting-tts synthesize / benchmark`), for any release:
+
+```python
+tts = Synthesizer.from_pretrained("v3.2", "cuda")
+wav, _ = tts(text, speaker="studio", cfg_scale=2.0, temperature=0.3, context=True)    # or paragraph=True
+tts_pauses = tts.variant(prosody=tts.prosody, prosody_durations="pauses")            # studio voice only
+```
+
+- **`paragraph=True`** (`--paragraph [CHARS]`): consecutive sentences are joined into units of at most 180 characters
+  (`text.group_sentences`, within the CUDA graphs' buckets) and each unit is synthesised in one pass, so the model
+  renders the gaps and the intonation across the sentences' boundaries itself; `pause` only separates the units.
+- **`context=True`** (`--context`): each sentence (or unit) is conditioned on the text before it. The end of the
+  previous one (whole words, up to 190 characters with the current one) runs through the text encoder and the prosody
+  predictor with it, and only the current one is generated (`DriftingTTS.synthesize(context=k)`; the DiT was trained
+  on crops of longer utterances, so this is in its training distribution). Such a sentence starts with less silence
+  (studio 72 ms, male 70 ms, female 13 ms less), which `PausePolicy.for_voice(context=True)` adds back
+  (`prosody.CONTEXT_LEAD`).
+- **`prosody_durations="pauses"`**: the prosody predictor also samples the durations of the tokens between words
+  (pauses and phrase breaks, at its own per-voice factors); the letters keep the regressors' durations. Eager and in
+  the CUDA graphs; not in batched synthesis.
+
+**Studio `val`** (100 held-out utterances, 98 of them 2–3 sentences; v3.2 = `drifting_tts_v3.2.pt`, the `drift`
+predictor's pitch at T 0.5 with the regressors' durations, Vocos v2, punctuation pauses; harvest F0 in semitones):
+
+| system | F0 std | F0 range | pauses / utt | pause s | syl/s | DTW F0 r | F0 RMSE | length | CER (CER*) | WER | UTMOSv2 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| recording | 3.68 | 11.9 | 1.39 | 0.139 | 6.22 | – | – | – | 0.88% (0.30%) | 2.06% | 3.093 |
+| v3.2 (sentence by sentence) | 3.53 | 11.3 | 1.54 | 0.175 | 6.01 | 0.579 | 3.25 | 1.035 | 0.42% (0.41%) | 2.02% | 2.990 |
+| `context=True` | 3.42 | 11.0 | 1.27 | 0.144 | 6.05 | 0.583 | 3.19 | 1.029 | 0.41% (0.39%) | 2.02% | 2.993 |
+| `paragraph=True` | 3.50 | 11.2 | 1.15 | 0.164 | 6.04 | 0.577 | 3.25 | 1.030 | 0.98% (0.38%) | 2.39% | 2.977 |
+| `"pauses"` | 3.57 | 11.5 | 2.28 | 0.172 | 6.00 | 0.570 | 3.31 | 1.037 | 0.48% (0.47%) | 2.32% | 2.994 |
+| `"pauses"` + `context=True` | 3.48 | 11.1 | 1.97 | 0.150 | 6.04 | 0.576 | 3.25 | 1.030 | 0.40% (0.41%) | 1.80% | 3.006 |
+| `"pauses"` + `paragraph=True` | 3.52 | 11.2 | 2.14 | 0.161 | 6.03 | 0.571 | 3.28 | 1.033 | 0.42% (0.40%) | 2.09% | 2.985 |
+
+CER* leaves out one utterance whose text says the same sentence twice: Whisper drops the repetition in the recording
+(116 character errors) and, in paragraph mode, in the generated audio too (the audio has the repetition: 15.8 s
+against 16.0 s sentence by sentence).
+
+- **Context gives the recordings' pauses and the closest contour.** Conditioned on the previous sentence, the gaps
+  are the recordings' (1.27 pauses per utterance of 0.144 s; recordings 1.39 / 0.139 s, v3.2 1.54 / 0.175 s), the
+  DTW F0 correlation and RMSE are the best of the rows (0.583 / 3.19 st against 0.579 / 3.25) and the length ratio
+  the closest to 1. Without `CONTEXT_LEAD` the gaps were too short (0.92 pauses of 0.120 s).
+- **Paragraph mode** has the same contour match and intelligibility as v3.2 here (CER* 0.38% against 0.41%) with
+  shorter gaps (1.15 of 0.164 s): the model's own sentence gaps, not inserted silence.
+- **Sampled pauses** add phrase breaks inside the sentences (pauses per utterance 2.28 against 1.54; with context
+  1.97) and give the highest UTMOSv2 (3.006 with context); their gaps are a little too frequent.
+- The F0 spread barely moves (3.42–3.57 st; recordings 3.68): the pitch is v3.2's sampler in every row.
+
+**Freya-495, sampled pauses** (`benchmark --prosody-durations pauses`, against the v3.2 rows of the release):
+
+| voice | v3.2 WER / UTMOSv2 | pauses WER / UTMOSv2 |
+|---|---|---|
+| studio | 1.33% / 3.021 | 1.33% [0.92, 1.77] / 3.030 |
+| male | 2.28% / 2.896 | 3.22% [2.61, 3.93] / 2.924 |
+| female | 3.99% / 2.722 | 5.40% [4.54, 6.27] / 2.744 |
+
+**Freya paragraphs** (`benchmark --join 3`: the 495 sentences as 165 items of three consecutive sentences; WER over
+the same words as Freya-495):
+
+| voice | v3.2 (sentence by sentence) | `context=True` | **`paragraph=True`** | `paragraph=True` + `"pauses"` |
+|---|---|---|---|---|
+| studio | 1.33% [0.87, 1.82] / 3.006 | 1.15% [0.77, 1.58] / 2.984 | **0.97% [0.54, 1.46] / 3.036** | 1.18% [0.72, 1.69] / 3.043 |
+| male | 1.76% [1.26, 2.33] / 2.791 | 1.56% [1.03, 2.13] / 2.817 | **1.46% [1.02, 1.95] / 2.927** | 2.15% [1.68, 2.64] / 2.984 |
+| female | 4.12% [3.35, 4.94] / 2.676 | 3.22% [2.49, 4.02] / 2.690 | **3.25% [2.61, 3.94] / 2.741** | 3.81% [3.03, 4.69] / 2.789 |
+
+WER [95% CI] / UTMOSv2 (CI ±0.03–0.04). Seed = item index, so these v3.2 rows are other samples than Freya-495's.
+
+- **Paragraph mode is better on every voice.** Fewer word errors (studio 1.33% → 0.97%, male 1.76% → 1.46%, female
+  4.12% → 3.25%) and higher UTMOSv2 (+0.03, +0.14, +0.07, disjoint intervals for male and female). The text
+  encoder, the prosody predictor and the DiT see the neighbouring sentences, as they did in training (98% of the
+  studio voice's training utterances have several sentences), and the gaps between the sentences come from the
+  model instead of fixed inserted silences.
+- **Context helps too, less.** Each sentence alone but conditioned on the one before: WER improves on every voice,
+  UTMOSv2 moves by −0.02 to +0.03.
+- **Sampled pauses on top raise UTMOSv2 further but cost the male and female voices words** (2.15%, 3.81%), as on
+  Freya-495: their recordings pause irregularly and the sampler reproduces it. For the studio voice the combination
+  keeps WER (1.18%) and gives the highest UTMOSv2 (3.043).
+- **Longer training windows are not needed for this.** The DiT was trained on 2.7 s crops; in paragraph mode it
+  generates units of up to 180 characters (about 13 s) in one pass, and does better than on single sentences. The
+  third item of #40 (training on full utterances) therefore has no measured problem to solve.
+
 ## Attention window on long texts
 
 The DiT is trained on 256-frame crops (128 tokens of 2 frames) but samples whole utterances (up to ~750 tokens).
