@@ -1,4 +1,51 @@
-# drifting-tts: one-step Turkish text-to-speech
+# Rima-Drift: Malayalam TTS training project
+
+Rima-Drift is a planned Malayalam adaptation of
+[kadirnar/drifting-tts](https://github.com/kadirnar/drifting-tts). The target is a full-weight text-to-speech model
+trained on the **Malayalam** subset of [ai4bharat/Rasa](https://huggingface.co/datasets/ai4bharat/Rasa), with separate
+female and male voices.
+
+**Status: planning.** This checkout still contains the upstream Turkish text frontend, training configurations, and
+published Turkish v3.1/v3.2 inference paths. No Malayalam model has been trained, evaluated, or released from this
+repository. The upstream examples below generate Turkish speech; they are not Malayalam demos.
+
+## Malayalam training requirements
+
+1. **Data:** obtain access to the gated Rasa dataset, select only its Malayalam subset, and retain the source-quality
+   48 kHz audio. Prepare 24 kHz audio and mels for this repository. Keep the female and male speaker IDs separate and
+   create fixed, disjoint train, development, and test splits. The dataset card lists 26.42 hours / 16,974 utterances
+   for the female voice and 25.22 hours / 16,877 utterances for the male voice.
+2. **Text:** replace or parameterize the Turkish-only normalizer and character vocabulary for Malayalam script,
+   including Unicode normalization, numbers, punctuation, and coverage checks. Reject or review transcripts that
+   cannot be represented faithfully rather than silently dropping characters.
+3. **Data quality and evaluation:** adapt the Turkish-specific ASR agreement, speaking-rate filters, and evaluation
+   to Malayalam. Review audio/transcript alignment and voice identity. Select checkpoints on development data and
+   report held-out intelligibility plus listening results for both voices.
+4. **Training:** first run a bounded pilot to check text coverage, alignment, losses, and generated audio. Then train
+   the Mel-MAE and acoustic TTS model, calibrate durations, fine-tune a vocoder, and train the separate stochastic
+   prosody model for a v3.2-style pipeline. The acoustic and prosody models use full-weight training; the repository's
+   vocoder recipes fine-tune pretrained vocoder weights. No LoRA is planned.
+5. **Release gate:** retain the data revision, configuration, checkpoints, evaluation outputs, and provenance.
+   Describe a Malayalam release as trained only after its exact checkpoint loads and passes held-out inference and
+   listening checks.
+
+### Resource budget
+
+| Resource | Initial planning target |
+|---|---|
+| GPU | One NVIDIA CUDA GPU with at least 32 GB VRAM for the documented recipe; 80 GB provides more headroom. The training scripts currently use one GPU. |
+| CPU and memory | About 8–16 CPU cores and 32–64 GB RAM for data preparation and loading. |
+| Free storage | At least 100 GB; 200 GB is preferred for the gated source data, processed audio/mels, checkpoints, and evaluation artifacts. |
+| Compute time | Reserve roughly 40–80 GPU-hours for a first end-to-end attempt, including pilots and iteration. This is an estimate, not a benchmark for the selected machine. |
+
+The [upstream training guide](docs/TRAINING.md) reports approximately 1.5 hours for Mel-MAE, 13.6 hours for the
+acoustic model, and 1 hour for a BigVGAN fine-tune on one RTX 5090. A v3.2-style release adds Vocos and prosody
+training. Malayalam timings and quality must be measured on the chosen GPU. The GPU machine has not been selected.
+
+## Upstream reference: drifting-tts (Turkish)
+
+The documentation below describes the original Turkish releases and remains here as a reference while the Malayalam
+adaptation is developed.
 
 [![Demo](https://img.shields.io/badge/🤗%20Demo-Space-yellow)](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-demo)
 [![WebGPU](https://img.shields.io/badge/🤗%20WebGPU-in%20your%20browser-orange)](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-webgpu)
@@ -26,7 +73,7 @@ higher on UTMOSv2; the male and female voices lose some intelligibility (Freya W
 and 3.02%) ([results](docs/RESULTS.md#v32-sampled-intonation-vocos-v2-punctuation-pauses)). v3.1 stays available
 unchanged.
 
-## Listen
+### Listen
 
 | text | studio | male | female |
 |---|---|---|---|
@@ -50,7 +97,7 @@ its latents: [DAC-VAE](https://huggingface.co/Vyvo/drifting-tts-tr-dacvae) (WER 
 same 100 Freya-TR-Eval sentences ([docs/LATENTS.md](docs/LATENTS.md)).
 [This Space](https://huggingface.co/spaces/Vyvo/drifting-tts-tr-compare) plays all three side by side.
 
-## Quick start
+### Quick start
 
 ```bash
 pip install "drifting-tts[bigvgan] @ git+https://github.com/kadirnar/drifting-tts"   # needs a CUDA build of PyTorch
@@ -125,7 +172,7 @@ of this model for fast inference and serving: the streaming DiT, batched serving
 kernel), a streaming server example with dynamic micro-batching, benchmarks, and the training code to reproduce v3.2.
 Its outputs match this repository bit for bit on every deterministic path.
 
-## In the browser (WebGPU)
+### In the browser (WebGPU)
 
 The model (v3.1's pipeline: the v3.2 prosody predictor is not exported to ONNX yet; Vocos v2 exports with
 `scripts/export_onnx.py --vocoder vocos-v2` but is not published) also runs entirely
@@ -140,7 +187,7 @@ speech is generated 12–22× faster than real time ([details](docs/RESULTS.md#i
 - **Page:** [`web/`](web/) holds the page, the pipeline (`tts.js`) and a JavaScript port of the Turkish text frontend
   (`text.js`).
 
-## On a Mac (MLX)
+### On a Mac (MLX)
 
 `drifting_tts.mlx` runs the model with [MLX](https://github.com/ml-explore/mlx) on Apple silicon. It needs neither
 PyTorch nor the rest of the training stack:
@@ -178,12 +225,12 @@ See [streaming, vocoders, memory settings and reproducible benchmarks](docs/MLX.
   The first request and optional `--compile` need separate measurement; these are not model-loading times. The small
   vocoders have not been timed on a Mac yet.
 
-## On iPhone and native macOS
+### On iPhone and native macOS
 
 The native Swift/MLX engine, iPhone app, installation instructions and device benchmarks are maintained in
 [**drifting-tts-swift**](https://github.com/kadirnar/drifting-tts-swift).
 
-## Benchmark: Freya-TR-Eval
+### Benchmark: Freya-TR-Eval
 
 [Freya-TR-Eval](https://huggingface.co/datasets/freyavoice/freya-tr-eval) has 495 everyday Turkish sentences that this
 model never saw. The protocol is the one in the FreyaTTS report: audio downsampled to 8 kHz, transcribed by
@@ -209,7 +256,7 @@ Whisper large-v3, and both texts normalised the same way. Lower is better.
   --prosody-durations regressor --pause punct --speaker studio` (v3.2; v3.1: `--model drifting_tts_v3.1.pt --vocoder
   bigvgan-v2-ft`), or all rows with `scripts/eval_release.sh`.
 
-## How it works
+### How it works
 
 ```
 text ─► Turkish normaliser ─► text encoder: durations ─► prosody model: pitch ─► DriftDiT (1 pass) ─► mel ─► Vocos ─► audio
@@ -225,7 +272,7 @@ text ─► Turkish normaliser ─► text encoder: durations ─► prosody mod
 4. A vocoder fine-tuned on the model's own spectrograms (Vocos v2 in v3.2, BigVGAN-v2 in v3.1) turns the mel into a
    24 kHz waveform.
 
-## Train it yourself
+### Train it yourself
 
 Any Hugging Face parquet dataset with `audio` and `text` columns works (`speaker` is optional).
 
@@ -243,7 +290,7 @@ drifting-tts finetune-vocoder --config configs/vocoder_bigvgan.yaml --workdir ru
 On one RTX 5090 the TTS model trains in 13.6 h (150k steps) and the vocoder fine-tunes in about 1 h. New voices can
 be added later by fine-tuning ([docs/TRAINING.md](docs/TRAINING.md#adding-a-voice)).
 
-## Documentation
+### Documentation
 
 | | |
 |---|---|
@@ -270,7 +317,7 @@ be added later by fine-tuning ([docs/TRAINING.md](docs/TRAINING.md#adding-a-voic
 | [scripts/eval_release.sh](scripts/eval_release.sh) | the evaluation of a release against v3.1 (Freya, prosody); `scripts/prepare_release.py` stages its files |
 | [scripts/compare_vocoders.py](scripts/compare_vocoders.py) | vocoder comparison ([docs/VOCODERS.md](docs/VOCODERS.md)) |
 
-## Limitations
+### Limitations
 
 - **Voices:** three built-in voices; no voice cloning from a reference recording.
 - **Prosody:** v3.2 samples the intonation with the recordings' spread, but the rhythm still comes from a
@@ -280,7 +327,7 @@ be added later by fine-tuning ([docs/TRAINING.md](docs/TRAINING.md#adding-a-voic
   against 1.74% and 3.02%); `from_pretrained("v3.1")` remains available.
 - **Naturalness:** measured only with automatic scores (UTMOSv2, DNSMOS, F0 statistics), not by listeners.
 
-## Citation and license
+### Citation and license
 
 ```bibtex
 @article{deng2026drifting,
