@@ -333,7 +333,8 @@ def run(args) -> None:
     if model.pitch_enabled:
         st = json.loads((Path(cfg.data.root) / "stats.json").read_text())
         model.lf0_stats.copy_(torch.tensor([st["lf0_mean"], st["lf0_std"]]))
-    mae = load_mae(cfg.mae.path, device)
+    mae = load_mae(cfg.mae.path, device, expected_backend=ds.backend, expected_language=ds.language,
+                   expected_mels=ds.dim)
     print(f"DriftingTTS: encoder {count_params(model.encoder):.2f}M + generator {count_params(model.generator):.2f}M "
           f"params; Mel-MAE {count_params(mae):.2f}M (frozen); {len(ds)} training utterances", flush=True)
     slm = None

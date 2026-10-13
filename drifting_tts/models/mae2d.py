@@ -120,8 +120,8 @@ class MelMAE2d(nn.Module):
         m = (torch.rand(B, nf, nt, device=device) < ratio).float()
         return m.repeat_interleave(mf, 1).repeat_interleave(mt, 2)[:, :Fr, :T]
 
-    def forward(self, mel: Tensor, mask_ratio: float = 0.5, labels: Tensor | None = None,
-                cls_weight: float = 0.0) -> tuple[Tensor, dict[str, Tensor]]:
+    def reconstruct(self, mel: Tensor, mask_ratio: float = 0.5) -> tuple[Tensor, Tensor, Tensor]:
+        """Return reconstructed mels, hidden-region mask, and encoder features for a fixed input."""
         B, Fr, T = mel.shape
         mask = self.make_mask(B, Fr, T, mask_ratio, mel.device)
         feats = self.encode(mel * (1 - mask))
@@ -129,13 +129,18 @@ class MelMAE2d(nn.Module):
         for up, skip in zip(self.ups, [feats[k] for k in ("layer3", "layer2", "layer1", "conv1")]):
             x = up(x, skip)
         recon = self.unpatchify(self.head(x), Fr, T)
+        return recon, mask, feats["layer4"]
+
+    def forward(self, mel: Tensor, mask_ratio: float = 0.5, labels: Tensor | None = None,
+                cls_weight: float = 0.0) -> tuple[Tensor, dict[str, Tensor]]:
+        recon, mask, last = self.reconstruct(mel, mask_ratio)
         err = (recon - mel) ** 2
         recon_loss = (err * mask).sum() / mask.sum().clamp_min(1.0)
         metrics = {"recon_loss": recon_loss.detach(),
                    "visible_loss": ((err * (1 - mask)).sum() / (1 - mask).sum().clamp_min(1.0)).detach()}
         loss = recon_loss
         if self.cls_head is not None and labels is not None and cls_weight > 0:
-            logits = self.cls_head(feats["layer4"].mean((-1, -2)))
+            logits = self.cls_head(last.mean((-1, -2)))
             cls_loss = F.cross_entropy(logits, labels)
             loss = (1 - cls_weight) * recon_loss + cls_weight * cls_loss
             metrics["cls_loss"] = cls_loss.detach()

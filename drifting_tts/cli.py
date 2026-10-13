@@ -12,6 +12,7 @@ COMMANDS: dict[str, str] = {
     "prepare": "drifting_tts.prepare",
     "score": "drifting_tts.score",
     "train-mae": "drifting_tts.train_mae",
+    "check-mae": "drifting_tts.check_mae",
     "train": "drifting_tts.train",
     "train-ar": "drifting_tts.train_ar",
     "train-bwe": "drifting_tts.train_bwe",

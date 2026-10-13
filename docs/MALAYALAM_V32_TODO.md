@@ -79,7 +79,7 @@ the later implementation stages.
       missing-field audits; source audio to 24 kHz/mel preparation; audit reports.
 - [x] **1 — Text/evaluation code:** Malayalam normalization and vocabulary, checkpoint
       compatibility checks, quality scoring, held-out manifests and per-voice evaluation.
-- [ ] **2 — Mel-MAE code:** Malayalam config, pilot/full-run commands, reconstruction and
+- [x] **2 — Mel-MAE code:** Malayalam config, pilot/full-run commands, reconstruction and
       checkpoint checks.
 - [ ] **3 — Acoustic code:** two-speaker config, alignment/overfit pilot, full-run command,
       duration calibration and per-voice checkpoint selection.
@@ -92,10 +92,39 @@ the later implementation stages.
 - [ ] **Implementation gate:** review and push the complete remote runbook and all code;
       record the final implementation commit ___ before any GPU job is submitted.
 
-Implementation stages 0–1 are code-complete and pushed. Their gated-data behavior and
+Implementation stages 0–2 are code-complete and pushed. Their gated-data behavior and
 Malayalam speech quality are **unverified** until remote execution. Number-bearing and
 unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
 added after the remote rejection audit shows which forms are actually present.
+
+### Stage 2 remote runbook (do not run until the implementation gate)
+
+Use the prepared `data/malayalam` directory created from the canonical Rasa parquet.
+The `bigvgan` mel backend must match the acoustic and Vocos stages. Keep pilot and full
+checkpoints in distinct directories; `train-mae` resumes automatically from `last.pt`
+within the selected workdir.
+
+```bash
+drifting-tts train-mae --config configs/mae2d_ml.yaml --workdir runs/mae2d_ml_pilot \
+  train.steps=200 train.batch_size=8 train.warmup=20 train.cls_finetune_steps=0 \
+  train.log_every=20 train.save_every=100
+drifting-tts check-mae --config configs/mae2d_ml.yaml \
+  --checkpoint runs/mae2d_ml_pilot/mae_ema.pt --split dev --per-speaker 4 \
+  --expected-step 200 --out runs/mae2d_ml_pilot/check
+
+drifting-tts train-mae --config configs/mae2d_ml.yaml --workdir runs/mae2d_ml
+drifting-tts check-mae --config configs/mae2d_ml.yaml \
+  --checkpoint runs/mae2d_ml/mae_ema.pt --split dev --per-speaker 4 \
+  --expected-step 60000 --out runs/mae2d_ml/check
+```
+
+Pilot gate: both voices have dev examples; training loss and masked reconstruction are
+finite, and loss trends down rather than diverging. Inspect `report.json` and the masked
+input/reconstruction arrays in `reconstruction_samples.npz` on the remote machine.
+The zero-output MSE is a reference, not an automatic pass threshold. Full-run gate:
+the 60k EMA checkpoint loads, matches Malayalam/BigVGAN/100-mel metadata, has finite
+activations for the acoustic drift loss, and its per-voice reconstruction is reviewed.
+Record the actual GPU-hours, selected checkpoint hash, dev results and any failure.
 
 ## Remote execution pass: only after the implementation gate
 

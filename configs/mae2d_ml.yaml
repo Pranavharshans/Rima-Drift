@@ -1,0 +1,11 @@
+# Rasa Malayalam, two speakers, BigVGAN-v2 mels. Run only on the remote GPU machine.
+base: mae2d.yaml
+
+data:
+  root: data/malayalam
+  language: ml
+
+train:
+  steps: 60000
+  num_workers: 3
+  save_every: 2000

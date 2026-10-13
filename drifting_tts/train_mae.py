@@ -34,11 +34,19 @@ def build_mae(cfg, num_classes: int = 0):
                   num_classes=n_cls, mask_patch=m.mask_patch)
 
 
-def load_mae(path: str | Path, device="cpu"):
+def load_mae(path: str | Path, device="cpu", *, expected_backend: str | None = None,
+             expected_language: str | None = None, expected_mels: int | None = None):
     """Load the EMA weights of a pretrained Mel-MAE (frozen, eval mode)."""
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     from .config import Config
 
+    meta = ckpt.get("data_meta")
+    if expected_language == "ml" and meta is None:
+        raise ValueError(f"{path}: Malayalam Mel-MAE checkpoint has no dataset metadata")
+    for key, expected in (("backend", expected_backend), ("language", expected_language),
+                          ("n_mels", expected_mels)):
+        if meta is not None and expected is not None and meta.get(key) != expected:
+            raise ValueError(f"{path}: Mel-MAE {key}={meta.get(key)!r}, expected {expected!r}")
     model = build_mae(Config(ckpt["config"]), ckpt.get("num_classes", 0))
     model.load_state_dict(ckpt["ema"])
     return model.to(device).eval().requires_grad_(False)
@@ -57,6 +65,11 @@ def run(args) -> None:
 
     ds = MelDataset(cfg.data.root, "train", min_quality=cfg.data.min_quality, min_frames=tc.crop_frames,
                     max_frames=cfg.data.max_frames, filters=cfg.data.get("filters"))
+    if cfg.data.get("language", "tr") != ds.language or ds.dim != cfg.model.n_mels:
+        raise ValueError(f"Mel-MAE config/data mismatch: language {cfg.data.get('language', 'tr')}/{ds.language}, "
+                         f"mel bins {cfg.model.n_mels}/{ds.dim}")
+    data_meta = {"language": ds.language, "backend": ds.backend, "n_mels": ds.dim,
+                 "num_speakers": ds.num_speakers}
     loader = DataLoader(ds, batch_size=tc.batch_size, sampler=RandomSampler(ds, replacement=True, num_samples=10**9),
                         collate_fn=collate, num_workers=tc.num_workers, pin_memory=True, drop_last=True,
                         persistent_workers=tc.num_workers > 0)
@@ -71,6 +84,8 @@ def run(args) -> None:
     ckpt_path = work / "last.pt"
     if ckpt_path.exists():
         ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        if ds.language == "ml" and ck.get("data_meta") != data_meta:
+            raise ValueError(f"{ckpt_path}: cannot resume with different Malayalam data metadata")
         model.load_state_dict(ck["model"])
         ema.model.load_state_dict(ck["ema"])
         opt.load_state_dict(ck["opt"])
@@ -105,8 +120,9 @@ def run(args) -> None:
                   flush=True)
         if step % tc.save_every == 0 or step == tc.steps:
             state = dict(model=model.state_dict(), ema=ema.model.state_dict(), opt=opt.state_dict(),
-                         sched=sched.state_dict(), step=step, config=cfg.to_dict(), num_classes=ds.num_speakers)
+                         sched=sched.state_dict(), step=step, config=cfg.to_dict(), num_classes=ds.num_speakers,
+                         data_meta=data_meta)
             save_checkpoint(ckpt_path, **state)
     save_checkpoint(work / "mae_ema.pt", ema=ema.model.state_dict(), config=cfg.to_dict(), num_classes=ds.num_speakers,
-                    step=step)
+                    step=step, data_meta=data_meta)
     print(f"done: {work / 'mae_ema.pt'}")

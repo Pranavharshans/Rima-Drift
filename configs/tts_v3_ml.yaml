@@ -1,6 +1,9 @@
 # Malayalam starting configuration. Revisit all thresholds on Rasa dev before training.
 base: tts_v3.yaml
 
+mae:
+  path: runs/mae2d_ml/mae_ema.pt
+
 data:
   root: data/malayalam
   min_quality: 0
