@@ -8,6 +8,7 @@ import sys
 
 # command name -> module exposing ``add_args(parser)`` and ``run(args)``
 COMMANDS: dict[str, str] = {
+    "rasa-prepare": "drifting_tts.rasa",
     "prepare": "drifting_tts.prepare",
     "score": "drifting_tts.score",
     "train-mae": "drifting_tts.train_mae",

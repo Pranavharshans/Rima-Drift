@@ -49,6 +49,16 @@ remote results and fixes get follow-up pushes.
 
 ## Implementation pass: complete and push before any GPU job
 
+The remote ingestion command is `drifting-tts rasa-prepare --revision <RASA_COMMIT_SHA>
+--out <REMOTE_GATED_DIR>`. Use `--inspect-only` first. It downloads only
+`Malayalam/train-*.parquet` and `Malayalam/test-*.parquet` to the remote Hugging Face
+cache, then writes canonical `train.parquet`, `dev.parquet`, `val.parquet` and `audit.json`.
+The public Rasa card specifies these fields and source splits, but actual parquet contents
+still require a gated remote inspection. The `val` split comes from Rasa's original test
+split; `dev` is a deterministic subset of its original train split. The canonical parquet
+still contains gated audio and must stay on the remote machine. The downstream feature
+preparation command and Malayalam text frontend are implemented in stage 1.
+
 - [ ] **0 — Data code:** remote-only Rasa Malayalam fetch with pinned revision and schema
       inspection; stable speaker mapping; deterministic splits; duplicate, duration and
       missing-field audits; source audio to 24 kHz/mel preparation; audit reports.
