@@ -95,6 +95,7 @@ def _iter_rows(files: list[str], trim: bool, limit: int, f0: bool = False, save_
     n = 0
     for f in files:
         pf = pq.ParquetFile(f)
+        canonical_split = Path(f).stem if preserve_splits and Path(f).stem in ("train", "dev", "val") else None
         if preserve_splits and "source_split" not in pf.schema_arrow.names:
             raise ValueError(f"{f}: --preserve-splits requires source_split")
         present = [c for c in META_COLUMNS if c in pf.schema_arrow.names]  # other datasets lack some metadata
@@ -109,7 +110,11 @@ def _iter_rows(files: list[str], trim: bool, limit: int, f0: bool = False, save_
                 row["save_audio"] = save_audio
                 row["language"] = language
                 if preserve_splits:
-                    if row["source_split"] == "test":  # canonical Rasa retains the source name for its held-out set
+                    if canonical_split is not None:
+                        # Canonical Rasa writes the derived split to the filename;
+                        # source_split retains the original train/test provenance.
+                        row["source_split"] = canonical_split
+                    elif row["source_split"] == "test":
                         row["source_split"] = "val"
                     elif row["source_split"] not in ("train", "dev", "val"):
                         raise ValueError(f"{f}: invalid source_split {row['source_split']!r}")
