@@ -24,6 +24,7 @@ disjoint ``--offset`` slice of ``val``, and report on ``val`` once.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import unicodedata
@@ -48,6 +49,8 @@ def add_args(p: argparse.ArgumentParser) -> None:
                    help="held-out split: tune on dev (prepare --dev-size), report on val")
     p.add_argument("--offset", type=int, default=0, help="skip the first N utterances of the split")
     p.add_argument("--num", type=int, default=100, help="number of utterances")
+    p.add_argument("--num-per-speaker", type=int, default=0,
+                   help="select this many held-out utterances per speaker instead of --num")
     p.add_argument("--cfg", type=float, nargs="+", default=[1.0])
     p.add_argument("--temperature", type=float, nargs="+", default=None,
                    help="noise temperatures (default: the checkpoint's preferred one, else 0.5)")
@@ -118,11 +121,28 @@ def summarize(rows: list[dict]) -> dict:
     return out
 
 
-def select(ds: MelDataset, split: str, offset: int, num: int) -> list[int]:
+def select(ds: MelDataset, split: str, offset: int, num: int, num_per_speaker: int = 0) -> list[int]:
+    if num_per_speaker:
+        if num_per_speaker < 1:
+            raise ValueError("--num-per-speaker must be positive")
+        by_speaker = {}
+        for i, item in enumerate(ds.items):
+            by_speaker.setdefault(item["speaker"], []).append(i)
+        if len(by_speaker) != ds.num_speakers:
+            raise ValueError(f"{split}: only {len(by_speaker)}/{ds.num_speakers} speakers available")
+        if any(len(v) < offset + num_per_speaker for v in by_speaker.values()):
+            raise ValueError(f"{split}: need {offset + num_per_speaker} held-out rows per speaker")
+        return sorted(i for rows in by_speaker.values() for i in rows[offset: offset + num_per_speaker])
     if offset >= len(ds):
         hint = " (create one with `drifting-tts prepare --dev-size N`)" if split == "dev" else ""
         raise SystemExit(f"--offset {offset} but the '{split}' split has {len(ds)} utterances{hint}")
     return list(range(offset, min(offset + num, len(ds))))
+
+
+def selection_hash(ds: MelDataset, indices: list[int]) -> str:
+    rows = [(ds.items[i].get("source_id"), ds.items[i]["speaker"], ds.items[i]["norm_text"])
+            for i in indices]
+    return hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode()).hexdigest()
 
 
 def format_table(rows: list[dict]) -> str:
@@ -164,7 +184,7 @@ def run(args) -> None:
     root = Path(synth.cfg.data.root)
     with_audio = (root / "audio.bin").exists() and not args.no_gt
     ds = MelDataset(root, args.split, min_frames=1, max_frames=10**9, with_audio=with_audio)
-    idx = select(ds, args.split, args.offset, args.num)
+    idx = select(ds, args.split, args.offset, args.num, getattr(args, "num_per_speaker", 0))
     judges = load_judges(args.asr, args.sv, args.mos, args.device, args.mos_repetitions, language=ds.language)
     refs = [_plain(ds.items[i]["norm_text"], language=ds.language) for i in idx]
     spk_refs: list[torch.Tensor | None] = [None] * len(idx)
@@ -212,6 +232,7 @@ def run(args) -> None:
                                         {"system": "drifting_tts", "temperature": t, "cfg": c}))
     _write(out, {
         "model": str(args.model), "split": args.split, "offset": args.offset, "num_utterances": len(idx),
+        "num_per_speaker": getattr(args, "num_per_speaker", 0), "selection_sha256": selection_hash(ds, idx),
         "steps": args.steps, "attn_window": args.attn_window, "length_scale": args.length_scale,
         "duration_scale": synth.model.duration_scale, "vocoder": args.vocoder or "stock",
         "judges": {"asr": args.asr if judges.asr else None, "sv": args.sv if judges.sv else None,
@@ -232,7 +253,7 @@ def run_harmonic(args, out: Path) -> None:
     root = Path(cfg.data.root)
     with_f0 = (root / "f0.bin").exists()
     ds = MelDataset(root, args.split, min_frames=1, max_frames=10**9, with_f0=with_f0)
-    idx = select(ds, args.split, args.offset, args.num)
+    idx = select(ds, args.split, args.offset, args.num, getattr(args, "num_per_speaker", 0))
     centers = mel_center_freqs(stats.get("backend", "vocos"))
     rows = []
     for t in temps:
@@ -248,5 +269,6 @@ def run_harmonic(args, out: Path) -> None:
             print(json.dumps(rows[-1]), flush=True)
     pitch = ("ground_truth" if with_f0 else "predicted") if model.pitch_enabled else None
     _write(out, {"model": str(args.model), "split": args.split, "offset": args.offset, "num_utterances": len(idx),
+                 "num_per_speaker": getattr(args, "num_per_speaker", 0), "selection_sha256": selection_hash(ds, idx),
                  "steps": args.steps, "alignment": "ground_truth (MAS)", "pitch": pitch,
                  "voicing": "f0 > 0" if with_f0 else "frames louder than the utterance median", "rows": rows})

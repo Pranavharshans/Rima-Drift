@@ -7,6 +7,9 @@ mae:
 data:
   root: data/malayalam
   min_quality: 0
+  expected_speakers:
+    malayalam_female: 0
+    malayalam_male: 1
   filters:
     min_mos: null
     min_spk_sim: null
@@ -16,3 +19,6 @@ data:
 
 model:
   language: ml
+
+train:
+  keep_snapshots: true  # compare development-set checkpoints, not just the final step

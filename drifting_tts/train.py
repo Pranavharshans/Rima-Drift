@@ -131,6 +131,20 @@ def build_loader(cfg: Config, split: str = "train") -> tuple[MelDataset, DataLoa
     ds = MelDataset(d.root, split, min_quality=d.min_quality, min_frames=cfg.drift.crop_frames,
                     max_frames=d.max_frames, with_f0=pitch_enabled(cfg), with_audio=needs_audio(cfg),
                     filters=d.get("filters"))
+    if t.get("pilot_per_speaker", 0):
+        limit = int(t.pilot_per_speaker)
+        if limit < 2:
+            raise ValueError("train.pilot_per_speaker must be at least 2")
+        counts = {}
+        selected = []
+        for item in ds.items:
+            spk = item["spk_id"]
+            if counts.get(spk, 0) < limit:
+                selected.append(item)
+                counts[spk] = counts.get(spk, 0) + 1
+        if len(counts) != ds.num_speakers or any(n < limit for n in counts.values()):
+            raise ValueError(f"pilot needs {limit} usable utterances per speaker; found {counts}")
+        ds.items = selected
     sampler = BucketBatchSampler([ds.frames(i) for i in range(len(ds))], max_frames=t.batch_frames,
                                  max_batch=t.batch_size, seed=t.seed)
     loader = DataLoader(ds, batch_sampler=sampler, collate_fn=collate, num_workers=t.num_workers,
@@ -155,6 +169,10 @@ def training_step(
         h, mu, logw, x_mask = model.encoder(text, text_len, spk)
     h, mu, logw = h.float(), mu.float(), logw.float()
     attn, logw_target = align(mu, x_mask, y, y_mask)
+    with torch.no_grad():
+        token_frames = attn.sum(-1)[:, None, :]
+        unaligned_tokens = (((token_frames == 0) * x_mask).sum() / x_mask.sum().clamp_min(1))
+        alignment_max_share = (token_frames[:, 0].max(-1).values / y_len.clamp_min(1)).mean()
     l_prior = prior_loss(expand(mu, attn), y, y_mask)
     l_dur = duration_loss(logw, logw_target, x_mask)
     l_pitch = torch.zeros((), device=device)
@@ -240,6 +258,7 @@ def training_step(
         metrics = {
             "loss": loss.detach(), "drift": l_drift.detach(), "prior": l_prior.detach(), "duration": l_dur.detach(),
             "recon_l1": l_recon.detach(), "pitch": l_pitch.detach(),
+            "unaligned_tokens": unaligned_tokens.detach(), "alignment_max_share": alignment_max_share.detach(),
             "centroid_mse": ((xg.mean(1) - y_c) ** 2).mean(),
             "sample_mse": ((xg - y_c[:, None]) ** 2).mean(),
             "across_sample_std": xg.std(1).mean(),
@@ -328,6 +347,11 @@ def run(args) -> None:
     ds, loader = build_loader(cfg)
     if cfg.model.get("language", "tr") != ds.language:
         raise ValueError(f"model language {cfg.model.get('language', 'tr')} != dataset language {ds.language}")
+    expected_speakers = cfg.data.get("expected_speakers")
+    if expected_speakers is not None:
+        actual_speakers = json.loads((Path(cfg.data.root) / "speakers.json").read_text())
+        if actual_speakers != dict(expected_speakers):
+            raise ValueError(f"speaker map {actual_speakers} != expected {dict(expected_speakers)}")
     val_ds = MelDataset(cfg.data.root, "val", min_frames=1, max_frames=10**9, filters=cfg.data.get("filters"))
     model = DriftingTTS(cfg.model, num_speakers=ds.num_speakers, n_mels=ds.dim).to(device)
     if model.pitch_enabled:
@@ -448,7 +472,8 @@ def run(args) -> None:
             for k, v in agg.items():
                 writer.add_scalar(f"train/{k}", v, step)
             writer.add_scalar("train/lr", sched.get_last_lr()[0], step)
-            keys = ["loss", "drift", "prior", "duration", "pitch", "centroid_mse", "across_sample_std", "force_0.05",
+            keys = ["loss", "drift", "prior", "duration", "pitch", "unaligned_tokens",
+                    "alignment_max_share", "centroid_mse", "across_sample_std", "force_0.05",
                     "force", "tau_mean", "p_data", "grad_norm", "grad_norm_enc", "slm_disc", "slm_d_real",
                     "slm_d_fake", "slm_adv", "slm_fm", "slm_grad_norm_x", "slm_capped"]
             print(f"step {step} " + " ".join(f"{k}={agg[k]:.4g}" for k in keys if k in agg)

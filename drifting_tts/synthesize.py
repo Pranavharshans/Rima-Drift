@@ -36,7 +36,9 @@ def add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--model", default=None, help="TTS checkpoint (default: the release's, else runs/tts/model_ema.pt)")
     p.add_argument("--text", help="text to synthesise (or use --text-file)")
     p.add_argument("--text-file", help="one utterance per line; writes <out-dir>/<n>.wav")
-    p.add_argument("--speaker", default=DEFAULT_VOICE, help=f"voice: {' or '.join(VOICES)} (default: {DEFAULT_VOICE})")
+    p.add_argument("--speaker", default=None,
+                   help=f"voice: {' or '.join(VOICES)} or a dataset speaker name "
+                        f"(default: {DEFAULT_VOICE} for Turkish)")
     p.add_argument("--list-speakers", action="store_true", help="list the voices")
     p.add_argument("--out", default="out.wav")
     p.add_argument("--out-dir", default="outputs/synth")
@@ -379,6 +381,8 @@ class Synthesizer:
 
     def speaker_id(self, speaker: str | int) -> int:
         """A voice name (``male`` / ``female``), a training speaker ID, or a dataset speaker name."""
+        if self.language == "ml" and speaker in ("female", "male"):
+            speaker = f"malayalam_{speaker}"
         if speaker in self.speakers and speaker not in VOICES:
             return self.speakers[speaker]
         return voice_id(speaker)
@@ -742,12 +746,17 @@ def run(args) -> None:
                         prosody_duration_temperature=args.prosody_duration_temperature,
                         prosody_pitch=args.prosody_pitch_model, **pipeline_args(args))
     if args.list_speakers:
+        if synth.language == "ml":
+            for name, speaker_id in synth.speakers.items():
+                print(f"{name}: speaker {speaker_id}")
+            return
         for name, v in VOICES.items():
             default = " (default)" if name == DEFAULT_VOICE else ""
             print(f"{name:7s} speaker {v['id']}, median pitch {v['pitch_hz']} Hz{default}")
         return
     temperature = synth.default_temperature if args.temperature is None else args.temperature
-    kw = dict(speaker=args.speaker, cfg_scale=args.cfg, temperature=temperature,
+    speaker = args.speaker or ("malayalam_female" if synth.language == "ml" else DEFAULT_VOICE)
+    kw = dict(speaker=speaker, cfg_scale=args.cfg, temperature=temperature,
               length_scale=args.length_scale, seed=args.seed, attn_window=args.attn_window,
               pitch_shift=args.pitch_shift, steps=args.steps)
     if args.text_file:

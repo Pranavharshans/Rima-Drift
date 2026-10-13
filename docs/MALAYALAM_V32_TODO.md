@@ -81,7 +81,7 @@ the later implementation stages.
       compatibility checks, quality scoring, held-out manifests and per-voice evaluation.
 - [x] **2 — Mel-MAE code:** Malayalam config, pilot/full-run commands, reconstruction and
       checkpoint checks.
-- [ ] **3 — Acoustic code:** two-speaker config, alignment/overfit pilot, full-run command,
+- [x] **3 — Acoustic code:** two-speaker config, alignment/overfit pilot, full-run command,
       duration calibration and per-voice checkpoint selection.
 - [ ] **4 — Vocos first-run code:** 40k-step config, resume source, copy-synthesis checks.
 - [ ] **5 — Vocos continuation code:** 160k additional steps, snapshot selection checks.
@@ -92,7 +92,7 @@ the later implementation stages.
 - [ ] **Implementation gate:** review and push the complete remote runbook and all code;
       record the final implementation commit ___ before any GPU job is submitted.
 
-Implementation stages 0–2 are code-complete and pushed. Their gated-data behavior and
+Implementation stages 0–3 are code-complete and pushed. Their gated-data behavior and
 Malayalam speech quality are **unverified** until remote execution. Number-bearing and
 unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
 added after the remote rejection audit shows which forms are actually present.
@@ -125,6 +125,58 @@ The zero-output MSE is a reference, not an automatic pass threshold. Full-run ga
 the 60k EMA checkpoint loads, matches Malayalam/BigVGAN/100-mel metadata, has finite
 activations for the acoustic drift loss, and its per-voice reconstruction is reviewed.
 Record the actual GPU-hours, selected checkpoint hash, dev results and any failure.
+
+### Stage 3 remote runbook (do not run until the implementation gate)
+
+The acoustic config is `configs/tts_v3_ml.yaml`: two fixed speaker IDs, Malayalam text,
+the stage-2 2-D Mel-MAE checkpoint, pitch conditioning, BigVGAN mels and 150k steps.
+The stage-1 Turkish speaking-rate and CER cutoffs remain disabled until Malayalam
+distributions are reviewed. Pilot training selects 16 usable train utterances per voice;
+it never uses `dev` or `val` as training data. The pilot has a separate workdir and
+reduces batch size, generator samples and steps to bound GPU use.
+
+```bash
+drifting-tts train --config configs/tts_v3_ml.yaml --workdir runs/tts_v3_ml_pilot \
+  train.pilot_per_speaker=16 train.steps=1000 train.batch_size=2 train.batch_frames=3000 \
+  train.warmup=100 train.num_workers=2 train.log_every=20 train.save_every=200 \
+  train.sample_every=0 train.keep_snapshots=false train.compile=false \
+  drift.gen_per_cond=4 drift.uncond_per_cond=4 drift.uncond_bank=128
+drifting-tts calibrate-durations --model runs/tts_v3_ml_pilot/model_ema.pt --num 16 --dry-run
+drifting-tts evaluate --model runs/tts_v3_ml_pilot/model_ema.pt --split dev \
+  --num-per-speaker 8 --temperature 0.5 --cfg 2 --sv none --mos none \
+  --out runs/tts_v3_ml_pilot/eval_dev
+
+drifting-tts train --config configs/tts_v3_ml.yaml --workdir runs/tts_v3_ml
+```
+
+Pilot gate: `loss`, `prior`, `duration`, `pitch`, `unaligned_tokens` and
+`alignment_max_share` remain finite; inspect the alignment metrics and loss trend,
+the per-speaker calibration ratios, and generated audio. A 1k-step pilot is an
+integration and overfit check, not a release-quality WER target. If it fails, preserve
+its logs and fix the code/data before the full run. The full workdir keeps EMA
+snapshots every 5k steps and resumes from `last.pt` in the same directory.
+
+Calibrate *each candidate* on training utterances, then compare the same balanced dev
+sentences with the same evaluation settings. For example:
+
+```bash
+for step in 100000 125000 150000; do
+  model="runs/tts_v3_ml/model_ema_${step}.pt"
+  drifting-tts calibrate-durations --model "$model" --num 200
+  drifting-tts evaluate --model "$model" --split dev --num-per-speaker 100 \
+    --temperature 0.5 --cfg 2 --sv none --mos none \
+    --out "runs/tts_v3_ml/eval_dev_${step}"
+done
+drifting-tts select-acoustic --results runs/tts_v3_ml/eval_dev_*/results.json \
+  --out runs/tts_v3_ml/checkpoint_ranking.json
+```
+
+The ranking requires both voices and identical dev settings. It ranks by the worse
+voice's WER, then mean WER; it is a review aid, not automatic approval. Listen to both
+voices, inspect per-speaker CER/WER and alignment, then record the selected checkpoint
+and SHA-256. Keep `val` untouched for final reporting in stage 7. A later Vocos run
+may change absolute quality, so the selected acoustic checkpoint remains provisional
+until the complete pipeline passes its held-out gate.
 
 ## Remote execution pass: only after the implementation gate
 

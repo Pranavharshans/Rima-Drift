@@ -9,6 +9,8 @@ preferred noise temperature, which the ``synthesize`` / ``evaluate`` CLIs then u
 from __future__ import annotations
 
 import argparse
+import json
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -60,7 +62,11 @@ def run(args) -> None:
           f"mean {r.mean():.3f}, p10 {np.percentile(r, 10):.3f}, p90 {np.percentile(r, 90):.3f}")
     # speakers differ in tempo, so every offered voice gets its own factor (the global one stays the fallback)
     n_spk = model.encoder.spk.num_embeddings
-    speakers = [voice_id(v) for v in (args.speakers or VOICES)]
+    dataset_speakers = json.loads((Path(d.root) / "speakers.json").read_text())
+    names = args.speakers or (list(dataset_speakers) if ds.language == "ml" else list(VOICES))
+    if ds.language == "ml":
+        names = [f"malayalam_{v}" if v in ("female", "male") else v for v in names]
+    speakers = [dataset_speakers[v] if v in dataset_speakers else voice_id(v) for v in names]
     scales = {}
     for spk in speakers:
         items = [i for i, e in enumerate(ds.items) if e["spk_id"] == spk]
