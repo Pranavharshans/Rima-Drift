@@ -1,0 +1,20 @@
+# First Malayalam v3.2 Vocos stage. Override tts.path with the selected acoustic
+# checkpoint on the remote GPU machine. The parent recipe starts from pretrained
+# charactr/vocos-mel-24khz and trains for 40k steps on BigVGAN-style mels.
+base: vocoder_vocos_bigvgan.yaml
+
+data:
+  root: data/malayalam
+  min_quality: 0
+  expected_language: ml
+  expected_speakers:
+    malayalam_female: 0
+    malayalam_male: 1
+
+vocoder:
+  backend: bigvgan
+
+train:
+  sample_split: dev
+  num_samples: 2
+  keep_snapshots: true

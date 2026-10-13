@@ -83,7 +83,7 @@ the later implementation stages.
       checkpoint checks.
 - [x] **3 — Acoustic code:** two-speaker config, alignment/overfit pilot, full-run command,
       duration calibration and per-voice checkpoint selection.
-- [ ] **4 — Vocos first-run code:** 40k-step config, resume source, copy-synthesis checks.
+- [x] **4 — Vocos first-run code:** 40k-step config, pretrained source, two-voice development copy-synthesis checks.
 - [ ] **5 — Vocos continuation code:** 160k additional steps, snapshot selection checks.
 - [ ] **6 — Prosody code:** frozen-acoustic target cache, pilot/full-run config, temperature
       calibration and deterministic fallback checks.
@@ -92,7 +92,7 @@ the later implementation stages.
 - [ ] **Implementation gate:** review and push the complete remote runbook and all code;
       record the final implementation commit ___ before any GPU job is submitted.
 
-Implementation stages 0–3 are code-complete and pushed. Their gated-data behavior and
+Implementation stages 0–4 are code-complete and pushed. Their gated-data behavior and
 Malayalam speech quality are **unverified** until remote execution. Number-bearing and
 unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
 added after the remote rejection audit shows which forms are actually present.
@@ -177,6 +177,39 @@ voices, inspect per-speaker CER/WER and alignment, then record the selected chec
 and SHA-256. Keep `val` untouched for final reporting in stage 7. A later Vocos run
 may change absolute quality, so the selected acoustic checkpoint remains provisional
 until the complete pipeline passes its held-out gate.
+
+### Stage 4 remote runbook (do not run until the implementation gate)
+
+Use the **selected and calibrated** stage-3 acoustic EMA checkpoint. The Malayalam
+config inherits the upstream 40k-step Vocos GAN recipe, which initializes the
+generator from `charactr/vocos-mel-24khz`; the discriminators start fresh. Both
+acoustic and prepared-data mels must be `bigvgan`. The trainer checks checkpoint
+language, speaker count/map, and prepared-data backend before training. Keep the
+pilot separate; the full workdir resumes from its own `last.pt` if interrupted.
+
+```bash
+ACOUSTIC_CKPT=runs/tts_v3_ml/model_ema_SELECTED_STEP.pt
+sha256sum "$ACOUSTIC_CKPT"
+drifting-tts finetune-vocoder --config configs/vocoder_vocos_ml.yaml \
+  --workdir runs/vocos_ml_pilot "tts.path=$ACOUSTIC_CKPT" \
+  train.steps=200 train.disc_warmup_steps=20 train.sample_every=100 \
+  train.save_every=100 train.log_every=20
+drifting-tts finetune-vocoder --config configs/vocoder_vocos_ml.yaml \
+  --workdir runs/vocos_ml "tts.path=$ACOUSTIC_CKPT"
+sha256sum runs/vocos_ml/last.pt runs/vocos_ml/vocos_ft.pt
+tensorboard --logdir runs/vocos_ml/tb
+```
+
+The TensorBoard audio triplets `real`, `recorded_mel` (copy synthesis), and `gta`
+(acoustic generated mel) come from the `dev` split and include one female and one
+male voice. At the pilot and each 5k-step checkpoint, compare each voice's triplet
+for clipping, buzz, dropped sounds, pitch change and intelligibility; inspect
+generator/discriminator and `mel_gta`/`mel_recorded` loss trends. Stop and diagnose
+if the pilot has nonfinite loss, mismatched framing or a missing voice. At 40k,
+retain the full `last.pt` with optimizer and discriminator state for stage 5,
+the exported `vocos_ft.pt`, snapshots and hashes. Record the selected acoustic
+path/hash, pretrained Vocos revision, prepared dataset revision, GPU-hours, and
+per-voice listening notes. Do not use Rasa `val` for tuning.
 
 ## Remote execution pass: only after the implementation gate
 

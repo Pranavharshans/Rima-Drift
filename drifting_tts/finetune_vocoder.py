@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import json
 import math
 import shutil
 import time
@@ -856,6 +857,14 @@ def run(args) -> None:
 
     tts, tts_cfg, stats = load_tts(cfg.tts.path, device)
     backend = stats.get("backend", "vocos")  # the mel type (or VAE latents) the TTS model was trained on
+    expected_language = cfg.data.get("expected_language")
+    if expected_language and tts_cfg.model.get("language", "tr") != expected_language:
+        raise ValueError(f"acoustic checkpoint language must be {expected_language!r}")
+    expected_speakers = cfg.data.get("expected_speakers")
+    if expected_speakers is not None:
+        actual = json.loads((Path(cfg.data.root) / "speakers.json").read_text())
+        if actual != dict(expected_speakers) or tts.encoder.spk.num_embeddings != len(actual):
+            raise ValueError(f"acoustic/prepared speaker mapping mismatch: {actual}")
     if cfg.vocoder.get("backend", backend) != backend:
         raise ValueError(f"config asks for {cfg.vocoder.backend} mels but the TTS model was trained on "
                          f"{backend} mels (`prepare --backend`)")
@@ -880,6 +889,9 @@ def run(args) -> None:
     d = cfg.data
     ds = MelDataset(d.root, "train", min_quality=d.min_quality, min_frames=min_frames, max_frames=d.max_frames,
                     with_audio=True, with_f0=tts.pitch_enabled, filters=d.get("filters"))
+    if ds.backend != backend or (expected_language and ds.language != expected_language):
+        raise ValueError(f"prepared data {ds.language}/{ds.backend} does not match acoustic checkpoint "
+                         f"{expected_language or tts_cfg.model.get('language', 'tr')}/{backend}")
     sampler = batch_sampler(ds, tc)
     loader = DataLoader(ds, batch_sampler=sampler, collate_fn=collate, num_workers=tc.num_workers,
                         pin_memory=True, persistent_workers=tc.num_workers > 0)
@@ -888,10 +900,21 @@ def run(args) -> None:
     writer = SummaryWriter(work / "tb")
     samples = None
     if tc.get("sample_every", 0) > 0:
-        val = MelDataset(d.root, "val", min_frames=min_frames, max_frames=d.max_frames, with_audio=True,
+        sample_split = tc.get("sample_split", "val")
+        val = MelDataset(d.root, sample_split, min_frames=min_frames, max_frames=d.max_frames, with_audio=True,
                          with_f0=tts.pitch_enabled)
-        val = val if len(val) else ds
-        samples = collate([val[i] for i in range(min(tc.get("num_samples", 2), len(val)))])
+        if not len(val):
+            raise ValueError(f"no vocoder sample rows in {sample_split!r}; sample checks cannot proceed")
+        selected, seen = [], set()
+        for i, item in enumerate(val.items):
+            if item["spk_id"] not in seen:
+                selected.append(i)
+                seen.add(item["spk_id"])
+            if len(selected) == min(tc.get("num_samples", 2), val.num_speakers):
+                break
+        if expected_speakers is not None and len(seen) != len(expected_speakers):
+            raise ValueError(f"{sample_split!r} lacks one or more expected voices for vocoder sample checks")
+        samples = collate([val[i] for i in selected])
 
     step = 0
     if (work / "last.pt").exists():
