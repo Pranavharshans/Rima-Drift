@@ -44,6 +44,9 @@ training. Malayalam timings and quality must be measured on the chosen GPU. The 
 
 The actionable stages, estimated code changes and training times are tracked in the
 [Malayalam v3.2 training TODO](docs/MALAYALAM_V32_TODO.md). Complete and push each stage separately.
+Implement and push **all** dataset, text, training, evaluation, and inference code before
+starting any GPU job. Dataset download and processing, scoring, and training will run only
+on the separate machine; no Rasa data or GPU job will be run on this local computer.
 
 ## Upstream reference: drifting-tts (Turkish)
 

@@ -3,11 +3,21 @@
 Status: **planning**. Target: a Malayalam, two-voice, v3.2-style TTS pipeline trained with
 `ai4bharat/Rasa` Malayalam on a separate GPU machine. No Malayalam checkpoint is trained or validated yet.
 
-Check off a stage only after its acceptance checks pass. For each stage, commit its code,
-configuration and small evidence files, then push that commit to `origin`. Record the commit,
-dataset revision, machine/GPU and result below. Keep gated audio, credentials and large
-checkpoints out of Git; retain their locations, hashes and provenance in the stage record.
-Do not advance a failed stage merely because its scheduled training steps finished.
+**Two passes, with a hard boundary:** first implement and push *all* stages' code,
+configurations, run commands, validation checks and checkpoint integration. No dataset
+download, dataset processing, scoring or GPU job runs on the local computer. Do not start
+**any GPU job** until all implementation checkboxes below are complete and the complete
+pipeline is pushed to `origin`. Then, on the separate machine, fetch and process Rasa,
+run the pilots and training jobs in dependency order, and review each acceptance gate.
+Push small evidence and any fixes after each remote stage. Record the commit, dataset
+revision, machine/GPU and result below. Keep gated audio, credentials and large checkpoints
+out of Git; retain their locations, hashes and provenance in the stage record. Do not
+advance a failed stage merely because its scheduled training steps finished.
+
+The initial dataset schema is gated. The remote-only ingestion code must inspect it and
+fail clearly on unexpected fields before full processing. If the first remote inspection
+reveals a mismatch, fix and push the code before proceeding. This is a validation/fix
+gate, not authorization to begin training early.
 
 ## Planning estimates
 
@@ -34,7 +44,30 @@ reports 1.5 hours for 60k Mel-MAE steps and 13.6 hours for 150k acoustic steps. 
 Reserve roughly **40–80 GPU-hours** for pilots, evaluation and a likely repeat of a weak
 stage. Code and review effort is roughly **2–4 focused engineering weeks**; update these
 estimates after a short benchmark on the chosen machine. Stages 5 and 6 can be evaluated
-independently once their dependencies exist, but each gets its own commit and push.
+independently once their dependencies exist. Every implementation stage gets its own push;
+remote results and fixes get follow-up pushes.
+
+## Implementation pass: complete and push before any GPU job
+
+- [ ] **0 — Data code:** remote-only Rasa Malayalam fetch with pinned revision and schema
+      inspection; stable speaker mapping; deterministic splits; duplicate, duration and
+      missing-field audits; source audio to 24 kHz/mel preparation; audit reports.
+- [ ] **1 — Text/evaluation code:** Malayalam normalization and vocabulary, checkpoint
+      compatibility checks, quality scoring, held-out manifests and per-voice evaluation.
+- [ ] **2 — Mel-MAE code:** Malayalam config, pilot/full-run commands, reconstruction and
+      checkpoint checks.
+- [ ] **3 — Acoustic code:** two-speaker config, alignment/overfit pilot, full-run command,
+      duration calibration and per-voice checkpoint selection.
+- [ ] **4 — Vocos first-run code:** 40k-step config, resume source, copy-synthesis checks.
+- [ ] **5 — Vocos continuation code:** 160k additional steps, snapshot selection checks.
+- [ ] **6 — Prosody code:** frozen-acoustic target cache, pilot/full-run config, temperature
+      calibration and deterministic fallback checks.
+- [ ] **7 — Integration code:** Malayalam checkpoint loading, two-voice synthesis, held-out
+      inference/listening protocol, provenance and release artifact checks.
+- [ ] **Implementation gate:** review and push the complete remote runbook and all code;
+      record the final implementation commit ___ before any GPU job is submitted.
+
+## Remote execution pass: only after the implementation gate
 
 ## Checklist and acceptance gates
 
