@@ -926,6 +926,13 @@ def run(args) -> None:
     elif tc.get("init_from"):
         if not hasattr(gan, "init_from"):
             raise ValueError("train.init_from is supported for vocoder.arch: vocos (GAN) only")
+        if tc.get("expected_init_step") is not None:
+            source = torch.load(tc.init_from, map_location="cpu", weights_only=False)
+            needed = {"vocos", "mpd", "mrd", "opt_g", "opt_d", "step"}
+            missing = needed - source.keys()
+            if missing or source["step"] != tc.expected_init_step:
+                raise ValueError(f"continuation source must be a complete step-{tc.expected_init_step} "
+                                 f"training checkpoint; missing={sorted(missing)}, step={source.get('step')}")
         gan.init_from(tc.init_from)
 
     it = infinite(loader)

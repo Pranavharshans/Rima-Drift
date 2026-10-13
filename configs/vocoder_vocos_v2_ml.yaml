@@ -1,0 +1,21 @@
+# Malayalam v3.2 Vocos continuation: 160k new steps after the 40k first run.
+# Keep this workdir distinct from stage 4; override tts.path remotely with
+# the exact same selected acoustic checkpoint used for the first Vocos run.
+base: vocoder_vocos_v2.yaml
+
+data:
+  root: data/malayalam
+  min_quality: 0
+  expected_language: ml
+  expected_speakers:
+    malayalam_female: 0
+    malayalam_male: 1
+
+vocoder:
+  backend: bigvgan
+
+train:
+  init_from: runs/vocos_ml/last.pt
+  expected_init_step: 40000
+  sample_split: dev
+  num_samples: 2

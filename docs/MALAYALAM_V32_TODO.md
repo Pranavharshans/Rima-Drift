@@ -84,7 +84,7 @@ the later implementation stages.
 - [x] **3 — Acoustic code:** two-speaker config, alignment/overfit pilot, full-run command,
       duration calibration and per-voice checkpoint selection.
 - [x] **4 — Vocos first-run code:** 40k-step config, pretrained source, two-voice development copy-synthesis checks.
-- [ ] **5 — Vocos continuation code:** 160k additional steps, snapshot selection checks.
+- [x] **5 — Vocos continuation code:** 160k additional steps, source checkpoint and snapshot selection checks.
 - [ ] **6 — Prosody code:** frozen-acoustic target cache, pilot/full-run config, temperature
       calibration and deterministic fallback checks.
 - [ ] **7 — Integration code:** Malayalam checkpoint loading, two-voice synthesis, held-out
@@ -92,7 +92,7 @@ the later implementation stages.
 - [ ] **Implementation gate:** review and push the complete remote runbook and all code;
       record the final implementation commit ___ before any GPU job is submitted.
 
-Implementation stages 0–4 are code-complete and pushed. Their gated-data behavior and
+Implementation stages 0–5 are code-complete and pushed. Their gated-data behavior and
 Malayalam speech quality are **unverified** until remote execution. Number-bearing and
 unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
 added after the remote rejection audit shows which forms are actually present.
@@ -210,6 +210,38 @@ retain the full `last.pt` with optimizer and discriminator state for stage 5,
 the exported `vocos_ft.pt`, snapshots and hashes. Record the selected acoustic
 path/hash, pretrained Vocos revision, prepared dataset revision, GPU-hours, and
 per-voice listening notes. Do not use Rasa `val` for tuning.
+
+### Stage 5 remote runbook (do not run until the implementation gate)
+
+The Malayalam continuation inherits the upstream Vocos v2 loss rebalance and
+cosine schedule. It starts a new 160k-step run from the complete stage-4 40k-step
+`last.pt`, loading generator, discriminators and optimizer states. The source
+checkpoint gate rejects wrong step counts or incomplete state. Keep the same
+selected acoustic checkpoint and prepared dataset as stage 4.
+
+```bash
+ACOUSTIC_CKPT=runs/tts_v3_ml/model_ema_SELECTED_STEP.pt
+sha256sum runs/vocos_ml/last.pt
+drifting-tts finetune-vocoder --config configs/vocoder_vocos_v2_ml.yaml \
+  --workdir runs/vocos_v2_ml "tts.path=$ACOUSTIC_CKPT"
+
+for step in 120000 140000 160000; do
+  vocoder="runs/vocos_v2_ml/vocos_ft_${step}.pt"
+  drifting-tts evaluate --model "$ACOUSTIC_CKPT" --vocoder "$vocoder" \
+    --split dev --num-per-speaker 100 --temperature 0.5 --cfg 2 \
+    --sv none --mos none --out "runs/vocos_v2_ml/eval_dev_${step}"
+done
+drifting-tts select-vocoder --results runs/vocos_v2_ml/eval_dev_*/results.json \
+  --out runs/vocos_v2_ml/checkpoint_ranking.json
+```
+
+These are example candidate steps in the **continuation** workdir; include any
+earlier or later snapshots with stronger listening quality. The ranking compares
+identical dev utterances for both voices, checks both generated and copy-synthesis
+WER, and refuses a missing recording reference. Listen to the saved audio and the
+TensorBoard `real`/`recorded_mel`/`gta` triplets, especially buzz, pitch and
+consonants. Select by review, record the selected export hash and the source
+`last.pt` hash, and retain all snapshot files. Never select on Rasa `val`.
 
 ## Remote execution pass: only after the implementation gate
 
