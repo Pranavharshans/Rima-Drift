@@ -581,8 +581,11 @@ def run(args) -> None:
     history = []
 
     def save(path: Path, full: bool) -> None:
+        from .models.prosody_net import tts_fingerprint
+
         state = dict(ema=ema.model.state_dict(), stats=pred.stats.state_dict(), net_cfg=pred.net_cfg,
                      cond_dim=cond_dim, step=step, tts=str(cfg.tts), config=cfg.to_dict(),
+                     tts_fingerprint=tts_fingerprint(tts),
                      tau=None if tau is None else float(tau.detach()), flow_steps=pred.flow_steps,
                      duration_scales=pred.duration_scales)
         if full:

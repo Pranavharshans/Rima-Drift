@@ -264,7 +264,7 @@ class Runner:
             return synth.vocoder(synth.stats.denormalize(u.mel))[0].cpu()
         if s.kind == "split":
             pause = 0.15
-            if s.jitter is not None:
+            if s.jitter is not None and synth.language != "ml":
                 from .prosody import PausePolicy
 
                 pause = PausePolicy.for_voice(self.speaker, jitter=s.jitter, context=s.context)

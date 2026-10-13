@@ -87,12 +87,12 @@ the later implementation stages.
 - [x] **5 — Vocos continuation code:** 160k additional steps, source checkpoint and snapshot selection checks.
 - [x] **6 — Prosody code:** frozen-acoustic target cache, pilot/full-run config, temperature
       calibration and deterministic fallback checks.
-- [ ] **7 — Integration code:** Malayalam checkpoint loading, two-voice synthesis, held-out
+- [x] **7 — Integration code:** Malayalam checkpoint loading, two-voice synthesis, held-out
       inference/listening protocol, provenance and release artifact checks.
-- [ ] **Implementation gate:** review and push the complete remote runbook and all code;
-      record the final implementation commit ___ before any GPU job is submitted.
+- [x] **Implementation gate:** review and push the complete remote runbook and all code;
+      record the final implementation commit after the stage-7 push before any GPU job is submitted.
 
-Implementation stages 0–6 are code-complete and pushed. Their gated-data behavior and
+Implementation stages 0–7 are code-complete and pushed. Their gated-data behavior and
 Malayalam speech quality are **unverified** until remote execution. Number-bearing and
 unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
 added after the remote rejection audit shows which forms are actually present.
@@ -278,6 +278,60 @@ Malayalam text and ASR language correctly. Try candidate temperatures and
 hurts either voice. Use deterministic prosody (`--prosody none` at synthesis)
 as the fallback if sampling degrades either voice. Record the selected prosody
 checkpoint hash and the cache/acoustic hashes. Do not tune on `val`.
+
+### Stage 7 remote runbook (only after the implementation gate and stages 0–6 pass)
+
+Use the exact selected and calibrated checkpoints from the earlier gates. The
+release check loads them on CPU, checks Malayalam vocabulary and speaker mapping,
+BigVGAN mel framing, Vocos metadata, the prosody acoustic fingerprint and both
+duration calibrations, then writes SHA-256 provenance. It does not certify speech
+quality. Run it first without held-out reports; keep its JSON beside the model
+artifacts and preserve the dataset revision and implementation commit.
+
+```bash
+ACOUSTIC_CKPT=runs/tts_v3_ml/model_ema_SELECTED_STEP.pt
+VOCODER_CKPT=runs/vocos_v2_ml/vocos_ft_SELECTED_STEP.pt
+PROSODY_CKPT=runs/prosody_ml/prosody_ema.pt
+RASA_REVISION=PINNED_RASA_COMMIT_SHA
+IMPLEMENTATION_COMMIT=$(git rev-parse HEAD)
+drifting-tts check-ml-release --acoustic "$ACOUSTIC_CKPT" \
+  --vocoder "$VOCODER_CKPT" --prosody "$PROSODY_CKPT" \
+  --dataset-revision "$RASA_REVISION" --implementation-commit "$IMPLEMENTATION_COMMIT" \
+  --out runs/release_ml/manifest.json
+
+for voice in female male; do
+  drifting-tts synthesize --model "$ACOUSTIC_CKPT" --vocoder "$VOCODER_CKPT" \
+    --prosody "$PROSODY_CKPT" --speaker "$voice" \
+    --text 'നമസ്കാരം. ഇന്ന് സുഖമാണോ?' --pause 0.15 \
+    --out "runs/release_ml/${voice}_sentences.wav"
+  drifting-tts synthesize --model "$ACOUSTIC_CKPT" --vocoder "$VOCODER_CKPT" \
+    --prosody "$PROSODY_CKPT" --speaker "$voice" --paragraph \
+    --text 'നമസ്കാരം. ഇന്ന് സുഖമാണോ?' --pause 0.15 \
+    --out "runs/release_ml/${voice}_paragraph.wav"
+  drifting-tts prosody --model "$ACOUSTIC_CKPT" --vocoder "$VOCODER_CKPT" \
+    --release-prosody "$PROSODY_CKPT" \
+    --systems recording copy predicted release release-para \
+    --split val --speaker "$voice" --num 100 \
+    --out "runs/release_ml/eval_val_${voice}"
+done
+
+drifting-tts check-ml-release --acoustic "$ACOUSTIC_CKPT" \
+  --vocoder "$VOCODER_CKPT" --prosody "$PROSODY_CKPT" \
+  --dataset-revision "$RASA_REVISION" --implementation-commit "$IMPLEMENTATION_COMMIT" \
+  --heldout-female runs/release_ml/eval_val_female/results.json \
+  --heldout-male runs/release_ml/eval_val_male/results.json \
+  --out runs/release_ml/manifest.json
+```
+
+The final check requires valid Malayalam ASR CER/WER for both voices and verifies
+that both held-out reports used these exact checkpoint paths. Review the WAVs,
+per-voice intelligibility, identity, copy quality, sampled versus deterministic
+rhythm/pitch, clipping, and paragraph pauses. Prefer fixed `--pause 0.15` until
+a Malayalam punctuation pause policy is calibrated; the upstream policy is
+Turkish-specific. If sampled prosody fails a voice, use deterministic prosody
+as the documented fallback and evaluate that exact mode before release. Keep
+Rasa audio, generated speech and large checkpoints on the remote machine;
+commit only manifests, concise metrics and approved documentation updates.
 
 ## Remote execution pass: only after the implementation gate
 

@@ -5,9 +5,10 @@ Rima-Drift is a planned Malayalam adaptation of
 trained on the **Malayalam** subset of [ai4bharat/Rasa](https://huggingface.co/datasets/ai4bharat/Rasa), with separate
 female and male voices.
 
-**Status: planning.** This checkout still contains the upstream Turkish text frontend, training configurations, and
-published Turkish v3.1/v3.2 inference paths. No Malayalam model has been trained, evaluated, or released from this
-repository. The upstream examples below generate Turkish speech; they are not Malayalam demos.
+**Status: implementation complete; remote execution pending.** The Malayalam Rasa ingestion,
+text frontend, Mel-MAE, acoustic, two-stage Vocos, prosody and release-check code is in place.
+No Malayalam model has been trained, evaluated, or released from this repository. The
+upstream examples below generate Turkish speech; they are not Malayalam demos.
 
 ## Malayalam training requirements
 

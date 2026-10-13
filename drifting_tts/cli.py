@@ -28,6 +28,7 @@ COMMANDS: dict[str, str] = {
     "extract-latents": "drifting_tts.extract_latents",
     "prosody-cache": "drifting_tts.prosody_cache",
     "train-prosody": "drifting_tts.train_prosody",
+    "check-ml-release": "drifting_tts.check_ml_release",
 }
 
 

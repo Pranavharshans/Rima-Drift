@@ -498,6 +498,8 @@ class ProsodyPredictor(nn.Module):
             if want != cond_dim:
                 raise ValueError(f"prosody model {path} expects {cond_dim} condition channels, the TTS gives {want}")
             if ck.get("tts_fingerprint") and ck["tts_fingerprint"] != tts_fingerprint(tts):
+                if ck.get("config", {}).get("expected_language") == "ml":
+                    raise ValueError(f"prosody model {path} was trained on a different Malayalam acoustic encoder")
                 warnings.warn(f"prosody model {path} was trained on the text encoder of another acoustic model "
                               f"(fingerprint {ck['tts_fingerprint']}, this one {tts_fingerprint(tts)}): check its "
                               "durations and pitch (scripts/eval_prosody_tokens.py) before using it", stacklevel=2)
