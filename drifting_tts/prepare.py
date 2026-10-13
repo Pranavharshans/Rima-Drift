@@ -27,9 +27,9 @@ import torch
 from tqdm import tqdm
 
 from .audio import BACKENDS, N_MELS, extract_f0, make_logmel, prepare_waveform
-from .text import normalize
+from .text import normalize, symbols_for
 
-META_COLUMNS = ["text", "speaker", "quality_score"]  # optional except text; a missing speaker column is one speaker
+META_COLUMNS = ["text", "speaker", "quality_score", "source_split", "source_id"]
 _MEL = None
 
 
@@ -37,6 +37,8 @@ def add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--dataset", default=None, help="HF dataset repo id (or use --parquet-glob)")
     p.add_argument("--parquet-glob", default=None, help="use local parquet files instead of the HF hub")
     p.add_argument("--out", default="data/train")
+    p.add_argument("--language", choices=("tr", "ml"), default="tr")
+    p.add_argument("--preserve-splits", action="store_true", help="use source_split from canonical Rasa parquet")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--val-size", type=int, default=200, help="held-out utterances for reported results")
     p.add_argument("--dev-size", type=int, default=0,
@@ -60,7 +62,10 @@ def _init_worker(backend: str = "vocos") -> None:
 
 
 def _process(row: dict) -> dict | None:
-    norm_text = normalize(row["text"] or "")
+    try:
+        norm_text = normalize(row["text"] or "", language=row.get("language", "tr"))
+    except ValueError as exc:
+        return {"error": f"text: {exc}", "source_id": row.get("source_id")}
     if len(norm_text) < 2:
         return None
     try:
@@ -85,10 +90,13 @@ def _process(row: dict) -> dict | None:
 
 
 def _iter_rows(files: list[str], trim: bool, limit: int, f0: bool = False, save_audio: bool = False,
-               f0_method: str = "dio", backend: str = "vocos", speaker_name: str | None = None):
+               f0_method: str = "dio", backend: str = "vocos", speaker_name: str | None = None,
+               language: str = "tr", preserve_splits: bool = False):
     n = 0
     for f in files:
         pf = pq.ParquetFile(f)
+        if preserve_splits and "source_split" not in pf.schema_arrow.names:
+            raise ValueError(f"{f}: --preserve-splits requires source_split")
         present = [c for c in META_COLUMNS if c in pf.schema_arrow.names]  # other datasets lack some metadata
         for rg in range(pf.num_row_groups):
             cols = pf.read_row_group(rg, columns=["audio", *present]).to_pylist()
@@ -99,6 +107,9 @@ def _iter_rows(files: list[str], trim: bool, limit: int, f0: bool = False, save_
                 row["f0"] = f0
                 row["f0_method"], row["backend"] = f0_method, backend
                 row["save_audio"] = save_audio
+                row["language"] = language
+                if preserve_splits and row["source_split"] not in ("train", "dev", "val"):
+                    raise ValueError(f"{f}: invalid source_split {row['source_split']!r}")
                 yield row
                 n += 1
                 if limit and n >= limit:
@@ -133,6 +144,7 @@ def choose_validation(index: list[dict], size: int, seed: int,
 
 
 def run(args) -> None:
+    symbols_for(args.language)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     files = _resolve_files(args)
@@ -144,21 +156,28 @@ def run(args) -> None:
     s = np.zeros(N_MELS, np.float64)
     ss = np.zeros(N_MELS, np.float64)
     offset = errors = skipped = 0
+    rejection_counts = Counter()
     lf0_sum = lf0_sq = 0.0
     lf0_n = 0
     f0_file = open(out / "f0.bin", "wb") if args.f0 else None
     audio_file = open(out / "audio.bin", "wb") if args.save_audio else None
     audio_offset = 0
     pool_args = dict(initializer=_init_worker, initargs=(args.backend,))
-    with open(out / "mels.bin", "wb") as fbin, Pool(args.workers, **pool_args) as pool:
+    with (open(out / "mels.bin", "wb") as fbin,
+          open(out / "rejections.jsonl", "w") as rejected,
+          Pool(args.workers, **pool_args) as pool):
         rows = _iter_rows(files, trim=not args.no_trim, limit=args.limit, f0=args.f0, save_audio=args.save_audio,
-                          f0_method=args.f0_method, backend=args.backend, speaker_name=args.speaker_name)
+                          f0_method=args.f0_method, backend=args.backend, speaker_name=args.speaker_name,
+                          language=args.language, preserve_splits=args.preserve_splits)
         for res in tqdm(pool.imap(_process, rows, chunksize=4), total=total, desc="prepare"):
             if res is None:
                 skipped += 1
                 continue
             if "error" in res:
                 errors += 1
+                rejection_counts[res["error"].split(":", 1)[0]] += 1
+                rejected.write(json.dumps({"source_id": res.get("source_id"), "reason": res["error"]},
+                                          ensure_ascii=False) + "\n")
                 continue
             fbin.write(res["mel"].tobytes())
             if f0_file is not None:
@@ -177,11 +196,16 @@ def run(args) -> None:
             ss += res["sumsq"]
 
     speakers = {name: i for i, name in enumerate(sorted({e["speaker"] for e in index}))}
-    val = choose_validation(index, args.val_size, args.seed, max_seconds=args.val_max_seconds)
-    dev = choose_validation(index, args.dev_size, args.seed + 1, exclude=val, max_seconds=args.val_max_seconds)
+    val = (set() if args.preserve_splits else
+           choose_validation(index, args.val_size, args.seed, max_seconds=args.val_max_seconds))
+    dev = (set() if args.preserve_splits else
+           choose_validation(index, args.dev_size, args.seed + 1, exclude=val, max_seconds=args.val_max_seconds))
     for i, e in enumerate(index):
         e["spk_id"] = speakers[e["speaker"]]
-        e["split"] = "val" if i in val else "dev" if i in dev else "train"
+        e["split"] = (e["source_split"] if args.preserve_splits else
+                      "val" if i in val else "dev" if i in dev else "train")
+    if not index or (args.preserve_splits and {e["split"] for e in index} != {"train", "dev", "val"}):
+        raise ValueError("no usable audio or a train/dev/val split is empty; inspect rejections.jsonl")
     with open(out / "index.jsonl", "w") as f:
         for e in index:
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
@@ -191,10 +215,12 @@ def run(args) -> None:
     std_bin = np.sqrt(np.maximum(ss / offset - mean_bin**2, 1e-8))
     mean = float(s.sum() / (offset * N_MELS))
     std = float(np.sqrt(ss.sum() / (offset * N_MELS) - mean**2))
-    stats = {"backend": args.backend, "mean": mean, "std": std,
+    stats = {"backend": args.backend, "language": args.language, "symbols": symbols_for(args.language),
+             "mean": mean, "std": std,
              "mean_bin": mean_bin.tolist(), "std_bin": std_bin.tolist(),
              "frames": int(offset), "utterances": len(index), "speakers": len(speakers),
-             "errors": errors, "skipped": skipped}
+             "errors": errors, "skipped": skipped, "rejection_counts": dict(rejection_counts),
+             "split_speakers": dict(Counter(f"{e['split']}:{e['speaker']}" for e in index))}
     if audio_file is not None:
         audio_file.close()
     if f0_file is not None:

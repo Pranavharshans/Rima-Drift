@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -68,9 +69,17 @@ def add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
 
 
-def _plain(text: str) -> str:
+def _plain(text: str, language: str = "tr") -> str:
     """Normalised text without punctuation: what CER / WER compare."""
-    return re.sub(r"\s+", " ", re.sub(r"[.,!?]", " ", normalize(text))).strip()
+    try:
+        value = normalize(text, language=language)
+    except ValueError:
+        if language != "ml":
+            raise
+        # ASR hypotheses can contain Latin text or digits. Preserve those errors in
+        # CER/WER rather than crashing or deleting unmatched characters.
+        value = unicodedata.normalize("NFC", text)
+    return re.sub(r"\s+", " ", re.sub(r"[.,!?]", " ", value)).strip()
 
 
 def to16k(wav: torch.Tensor) -> np.ndarray:
@@ -78,14 +87,14 @@ def to16k(wav: torch.Tensor) -> np.ndarray:
 
 
 def score_utterance(judges: Judges, wav: torch.Tensor, ref: str,
-                    spk_ref: torch.Tensor | None = None) -> tuple[dict, torch.Tensor | None]:
+                    spk_ref: torch.Tensor | None = None, language: str = "tr") -> tuple[dict, torch.Tensor | None]:
     """Judge one 24 kHz utterance against its plain reference text (and reference speaker embedding).
 
     Returns the utterance row and its speaker embedding."""
     w16 = to16k(wav)
     row: dict = {"ref": ref}
     if judges.asr is not None:
-        row["hyp"] = _plain(judges.asr(w16))
+        row["hyp"] = _plain(judges.asr(w16), language=language)
         row.update(error_counts(ref, row["hyp"]))
     emb = judges.sv(w16) if judges.sv is not None else None
     if emb is not None and spk_ref is not None:
@@ -156,24 +165,26 @@ def run(args) -> None:
     with_audio = (root / "audio.bin").exists() and not args.no_gt
     ds = MelDataset(root, args.split, min_frames=1, max_frames=10**9, with_audio=with_audio)
     idx = select(ds, args.split, args.offset, args.num)
-    judges = load_judges(args.asr, args.sv, args.mos, args.device, args.mos_repetitions)
-    refs = [_plain(ds.items[i]["norm_text"]) for i in idx]
+    judges = load_judges(args.asr, args.sv, args.mos, args.device, args.mos_repetitions, language=ds.language)
+    refs = [_plain(ds.items[i]["norm_text"], language=ds.language) for i in idx]
     spk_refs: list[torch.Tensor | None] = [None] * len(idx)
     (out / "wav").mkdir(exist_ok=True)
 
     def evaluate_system(tag: str, wavs, info: dict) -> dict:
         utts, rtf = [], []
         for k, (wav, extra) in enumerate(wavs):
-            row, emb = score_utterance(judges, wav, refs[k], spk_refs[k])
+            row, emb = score_utterance(judges, wav, refs[k], spk_refs[k], language=ds.language)
             if info["system"] != "drifting_tts" and spk_refs[k] is None:
                 spk_refs[k] = emb  # the first ground-truth row is the speaker reference
-            utts.append({"index": idx[k], **row, **extra})
+            utts.append({"index": idx[k], "speaker": ds.items[idx[k]]["speaker"], **row, **extra})
             rtf += [extra["rtf"]] if "rtf" in extra else []
             if k < args.save_wavs:
                 sf.write(out / "wav" / f"{tag}_{idx[k]:04d}.wav", wav.numpy(), SAMPLE_RATE)
         with open(out / f"utterances_{tag}.jsonl", "w") as f:
             f.writelines(json.dumps(u, ensure_ascii=False) + "\n" for u in utts)
         row = {**info, **summarize(utts)}
+        row["per_speaker"] = {speaker: summarize([u for u in utts if u["speaker"] == speaker])
+                              for speaker in sorted({u["speaker"] for u in utts})}
         if rtf:
             row["rtf"] = float(np.mean(rtf))
         print(json.dumps(row), flush=True)

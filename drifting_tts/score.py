@@ -82,9 +82,9 @@ def edit_distance(a, b) -> int:
     return prev[-1]
 
 
-def error_rates(ref: str, hyp: str) -> tuple[float, float]:
+def error_rates(ref: str, hyp: str, language: str = "tr") -> tuple[float, float]:
     """CER and WER of ``hyp`` against ``ref``, both normalised without punctuation (as in ``evaluate``)."""
-    r, h = _plain(ref), _plain(hyp)
+    r, h = _plain(ref, language=language), _plain(hyp, language=language)
     return edit_distance(r, h) / max(len(r), 1), edit_distance(r.split(), h.split()) / max(len(r.split()), 1)
 
 
@@ -177,7 +177,7 @@ class AsrScorer:
 
     name, key = "asr", "cer"
 
-    def __init__(self, model: str, device: str, beam_size: int, batch_size: int):
+    def __init__(self, model: str, device: str, beam_size: int, batch_size: int, language: str = "tr"):
         import faster_whisper
 
         dev, _, idx = device.partition(":")
@@ -185,7 +185,8 @@ class AsrScorer:
                                                  compute_type="float16" if dev == "cuda" else "int8")
         self.batched = (faster_whisper.BatchedInferencePipeline(self.model)
                         if hasattr(faster_whisper, "BatchedInferencePipeline") else None)
-        self.opts = dict(language="tr", beam_size=beam_size, without_timestamps=True)
+        self.language = language
+        self.opts = dict(language=language, beam_size=beam_size, without_timestamps=True)
         self.batch_size = batch_size
         if dev == "cuda":  # the numpy log-mel took ~0.3 s per 10 s clip on a busy CPU, 2 ms in torch
             self.model.feature_extractor = _torch_whisper_features(self.model.feature_extractor, device)
@@ -234,8 +235,8 @@ class AsrScorer:
         hyps = self.transcribe([w16.numpy() for _, _, w16 in batch])
         out = []
         for (i, _, _), hyp in zip(batch, hyps):
-            cer, wer = error_rates(index[i]["norm_text"], hyp)
-            out.append((i, {"hyp": _plain(hyp), "cer": _r(cer), "wer": _r(wer)}))
+            cer, wer = error_rates(index[i]["norm_text"], hyp, language=self.language)
+            out.append((i, {"hyp": _plain(hyp, language=self.language), "cer": _r(cer), "wer": _r(wer)}))
         return out
 
 
@@ -401,6 +402,7 @@ def write_scores(root: Path, scores: dict[int, dict]) -> None:
 
 def score(root: Path, names: list[str], args) -> None:
     index = read_index(root)
+    language = json.loads((root / "stats.json").read_text()).get("language", "tr")
     ids = range(min(args.limit, len(index)) if args.limit else len(index))
     scores = load_scores(root)
     write_scores(root, scores)  # drops a line cut short by an interrupted run before appending
@@ -418,7 +420,8 @@ def score(root: Path, names: list[str], args) -> None:
         scorers = []
         for name in audio_names:
             if name == "asr":
-                scorers.append(AsrScorer(args.asr_model, args.device, args.beam_size, args.asr_batch_size))
+                scorers.append(AsrScorer(args.asr_model, args.device, args.beam_size, args.asr_batch_size,
+                                         language=language))
             elif name == "mos":
                 scorers.append(DnsMos(args.device))
             elif name == "bandwidth":

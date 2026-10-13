@@ -58,11 +58,26 @@ still require a gated remote inspection. The `val` split comes from Rasa's origi
 split; `dev` is a deterministic subset of its original train split. The canonical parquet
 still contains gated audio and must stay on the remote machine. The downstream feature
 preparation command and Malayalam text frontend are implemented in stage 1.
+Install the repository with `pip install -e '.[rasa,score,eval,bigvgan]'` on the remote
+machine; authenticate to the gated dataset there before running ingestion.
 
-- [ ] **0 — Data code:** remote-only Rasa Malayalam fetch with pinned revision and schema
+After the gated remote inspection, prepare the canonical parquet files with
+`drifting-tts prepare --parquet-glob '<REMOTE_GATED_DIR>/*.parquet' --out
+<REMOTE_PREPARED_DIR> --language ml --preserve-splits --backend bigvgan --f0
+--save-audio`. This creates 24 kHz waveforms/mels and a `rejections.jsonl` audit. The
+Malayalam frontend preserves Unicode script and rejects unsupported symbols or digits
+that need a reviewed spoken form; it does not silently delete them. Review the rejection
+counts and examples on the remote machine. Run `drifting-tts score --data
+<REMOTE_PREPARED_DIR>` there; ASR uses Malayalam. The Turkish rate and CER thresholds
+are disabled in `configs/tts_v3_ml.yaml` until measured Malayalam thresholds are approved.
+The Rasa `val` split is reserved for final reporting; use `dev` for tuning. The evaluation
+result includes metrics by speaker. Full run commands and final thresholds belong to
+the later implementation stages.
+
+- [x] **0 — Data code:** remote-only Rasa Malayalam fetch with pinned revision and schema
       inspection; stable speaker mapping; deterministic splits; duplicate, duration and
       missing-field audits; source audio to 24 kHz/mel preparation; audit reports.
-- [ ] **1 — Text/evaluation code:** Malayalam normalization and vocabulary, checkpoint
+- [x] **1 — Text/evaluation code:** Malayalam normalization and vocabulary, checkpoint
       compatibility checks, quality scoring, held-out manifests and per-voice evaluation.
 - [ ] **2 — Mel-MAE code:** Malayalam config, pilot/full-run commands, reconstruction and
       checkpoint checks.
@@ -76,6 +91,11 @@ preparation command and Malayalam text frontend are implemented in stage 1.
       inference/listening protocol, provenance and release artifact checks.
 - [ ] **Implementation gate:** review and push the complete remote runbook and all code;
       record the final implementation commit ___ before any GPU job is submitted.
+
+Implementation stages 0–1 are code-complete and pushed. Their gated-data behavior and
+Malayalam speech quality are **unverified** until remote execution. Number-bearing and
+unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
+added after the remote rejection audit shows which forms are actually present.
 
 ## Remote execution pass: only after the implementation gate
 

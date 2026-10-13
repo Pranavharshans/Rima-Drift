@@ -39,6 +39,7 @@ from .models.mae import delta_features
 from .models.text_encoder import align, duration_loss, expand, prior_loss, token_pitch
 from .models.tts import DriftingTTS
 from .slm import audio_segments, needs_audio, slm_enabled
+from .text import symbols_for
 from .train_mae import load_mae
 from .utils import EMA, count_params, infinite, lr_lambda, rng_state, save_checkpoint, seed_everything, set_rng_state
 
@@ -260,7 +261,8 @@ def training_step(
 
 def dataset_stats(ds: MelDataset) -> dict:
     """What inference needs to turn the model's normalised frames into audio (stored in the exported checkpoint)."""
-    return {**ds.stats.to_dict(), "backend": ds.backend, "dim": ds.dim, "frame_rate": ds.frame_rate,
+    return {**ds.stats.to_dict(), "backend": ds.backend, "language": ds.language,
+            "dim": ds.dim, "frame_rate": ds.frame_rate,
             "latent_repeat": ds.latent_repeat}
 
 
@@ -324,6 +326,8 @@ def run(args) -> None:
     device = "cuda" if torch.cuda.is_available() and not tc.get("cpu", False) else "cpu"
 
     ds, loader = build_loader(cfg)
+    if cfg.model.get("language", "tr") != ds.language:
+        raise ValueError(f"model language {cfg.model.get('language', 'tr')} != dataset language {ds.language}")
     val_ds = MelDataset(cfg.data.root, "val", min_frames=1, max_frames=10**9, filters=cfg.data.get("filters"))
     model = DriftingTTS(cfg.model, num_speakers=ds.num_speakers, n_mels=ds.dim).to(device)
     if model.pitch_enabled:
@@ -458,11 +462,11 @@ def run(args) -> None:
                             log_taus=None if log_taus is None else log_taus.state_dict(),
                             taus=None if taus is None else taus.state_dict(),
                             epoch=loader.batch_sampler.epoch, bank=bank.state_dict(), rng=rng_state(),
-                            config=cfg.to_dict(), num_speakers=ds.num_speakers,
+                            config=cfg.to_dict(), num_speakers=ds.num_speakers, symbols=symbols_for(ds.language),
                             **({} if slm is None else {"slm": slm.state_dict()}))
             save_checkpoint(work / "model_ema.pt", ema=ema.model.state_dict(), config=cfg.to_dict(),
                             num_speakers=ds.num_speakers, step=step, taus=None if taus is None else taus.state_dict(),
-                            n_mels=ds.dim, stats=dataset_stats(ds), **calib)
+                            n_mels=ds.dim, stats=dataset_stats(ds), symbols=symbols_for(ds.language), **calib)
             if tc.get("keep_snapshots", False):  # every export also as model_ema_<step>.pt
                 shutil.copyfile(work / "model_ema.pt", work / f"model_ema_{step}.pt")
     stale = "" if duration_scale is None else " (stale duration_scale: re-run `drifting-tts calibrate-durations`)"
@@ -490,6 +494,13 @@ def load_tts(path: str | Path, device="cpu") -> tuple[DriftingTTS, Config, dict]
     """Load an exported (EMA) model: returns the model, its config and the mel statistics."""
     ck = torch.load(path, map_location="cpu", weights_only=False)
     cfg = Config(ck["config"])
+    from .text import symbols_for
+
+    language = cfg.model.get("language", "tr")
+    if language == "ml" and "symbols" not in ck:
+        raise ValueError(f"{path}: Malayalam checkpoint is missing its text vocabulary")
+    if ck.get("symbols", symbols_for(language)) != symbols_for(language):
+        raise ValueError(f"{path}: checkpoint text vocabulary differs from {language} frontend")
     if cfg.model.get("kind") == "ar":  # ARDrift (train-ar): autoregressive with a one-step drifting head
         from .models.ar import ARDriftTTS
 
@@ -506,5 +517,6 @@ def load_tts(path: str | Path, device="cpu") -> tuple[DriftingTTS, Config, dict]
 
         s = MelStats.load(cfg.data.root)
         stats = {"mean": s.mean, "std": s.std, "backend": "vocos"}
+    if stats.get("language", "tr") != language:
+        raise ValueError(f"{path}: checkpoint model language {language} != data language {stats.get('language', 'tr')}")
     return model.to(device).eval(), cfg, stats
-

@@ -189,7 +189,23 @@ def turkish_lower(text: str) -> str:
     return text.replace("I", "ı").replace("İ", "i").lower()
 
 
-def normalize(text: str) -> str:
+def symbols_for(language: str = "tr") -> list[str]:
+    if language == "ml":
+        from .text_ml import SYMBOLS as ml_symbols
+
+        return ml_symbols
+    if language != "tr":
+        raise ValueError(f"unsupported text language: {language}")
+    return SYMBOLS
+
+
+def normalize(text: str, language: str = "tr") -> str:
+    if language == "ml":
+        from .text_ml import normalize as normalize_ml
+
+        return normalize_ml(text)
+    if language != "tr":
+        raise ValueError(f"unsupported text language: {language}")
     """Normalise raw Turkish text to the symbol alphabet (lower-case letters, space and ``.,!?``)."""
     # drop combining marks left after NFC, e.g. the U+0307 in "i̇" that Python's "İ".lower() produces
     text = "".join(c for c in unicodedata.normalize("NFC", text) if not unicodedata.combining(c))
@@ -224,11 +240,14 @@ def normalize(text: str) -> str:
     return text
 
 
-def text_to_ids(text: str, intersperse_blank: bool = True, normalized: bool = False) -> list[int]:
+def text_to_ids(text: str, intersperse_blank: bool = True, normalized: bool = False,
+                language: str = "tr") -> list[int]:
     """Map text to symbol ids; optionally intersperse a blank token (Grad-TTS) for alignment."""
     if not normalized:
-        text = normalize(text)
-    ids = [SYMBOL_TO_ID[c] for c in text]
+        text = normalize(text, language=language)
+    symbols = symbols_for(language)
+    table = {s: i for i, s in enumerate(symbols)}
+    ids = [table[c] for c in text]
     if intersperse_blank:
         out = [BLANK_ID] * (2 * len(ids) + 1)
         out[1::2] = ids
@@ -236,8 +255,9 @@ def text_to_ids(text: str, intersperse_blank: bool = True, normalized: bool = Fa
     return ids
 
 
-def ids_to_text(ids: list[int]) -> str:
-    return "".join(SYMBOLS[i] for i in ids if i not in (PAD_ID, BLANK_ID))
+def ids_to_text(ids: list[int], language: str = "tr") -> str:
+    symbols = symbols_for(language)
+    return "".join(symbols[i] for i in ids if i not in (PAD_ID, BLANK_ID))
 
 
 def group_sentences(sentences: list[str], max_chars: int = 180) -> list[str]:

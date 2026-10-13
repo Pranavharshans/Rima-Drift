@@ -1,0 +1,15 @@
+# Malayalam starting configuration. Revisit all thresholds on Rasa dev before training.
+base: tts_v3.yaml
+
+data:
+  root: data/malayalam
+  min_quality: 0
+  filters:
+    min_mos: null
+    min_spk_sim: null
+    rate: [null, null]
+    min_bandwidth: null
+    max_cer: null
+
+model:
+  language: ml

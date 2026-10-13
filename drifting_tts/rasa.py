@@ -108,9 +108,10 @@ def run(args: argparse.Namespace) -> None:
     try:
         for path, source_split in files:
             pf = pq.ParquetFile(path)
+            columns = sorted(REQUIRED | ({"style"} & set(pf.schema_arrow.names)))
             for rg in range(pf.num_row_groups):
                 batches = {split: [] for split in writers}
-                for row in pf.read_row_group(rg, columns=sorted(REQUIRED | ({"style"} & set(pf.schema_arrow.names)))).to_pylist():
+                for row in pf.read_row_group(rg, columns=columns).to_pylist():
                     record, split = canonicalize(row, source_split, args.seed, args.dev_percent)
                     if record is None:
                         counts[f"reject:{split}"] += 1
@@ -130,8 +131,9 @@ def run(args: argparse.Namespace) -> None:
     finally:
         for writer in writers.values():
             writer.close()
-    if not all(any(k.startswith(f"{split}:") for k in counts) for split in ("train", "dev", "val")):
-        raise ValueError(f"empty split; inspect audit and source: {dict(counts)}")
+    if any(counts[f"{split}:{speaker}"] == 0 for split in ("train", "dev", "val")
+           for speaker in SPEAKERS.values()):
+        raise ValueError(f"empty speaker/split; inspect audit and source: {dict(counts)}")
     audit = {"dataset": "ai4bharat/Rasa", "revision": args.revision, "seed": args.seed,
              "dev_percent": args.dev_percent, "source_files": [str(p.relative_to(root)) for p, _ in files],
              "counts": dict(sorted(counts.items())), "speaker_map": SPEAKERS,

@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import Dataset, Sampler
 
 from .audio import FRAME_RATE, N_MELS
-from .text import PAD_ID, text_to_ids
+from .text import PAD_ID, symbols_for, text_to_ids
 
 SCORE_ALIASES = {"mos": "mos_ovrl", "rate": "cps", "bandwidth": "bw_hz"}
 
@@ -122,6 +122,11 @@ class MelDataset(Dataset):
         root = Path(root)
         self.stats = MelStats.load(root)
         st = json.loads((root / "stats.json").read_text())
+        self.language = st.get("language", "tr")
+        if self.language == "ml" and "symbols" not in st:
+            raise ValueError(f"{root}: Malayalam dataset is missing its text vocabulary")
+        if st.get("symbols", symbols_for(self.language)) != symbols_for(self.language):
+            raise ValueError(f"{root}: text vocabulary differs from current {self.language} frontend")
         self.backend = st.get("backend", "vocos")
         # features per frame and frames per second: 100 log-mel bins at 93.75 Hz, or VAE latents (extract-latents)
         self.dim, self.frame_rate = int(st.get("dim", N_MELS)), float(st.get("frame_rate", FRAME_RATE))
@@ -191,7 +196,7 @@ class MelDataset(Dataset):
         e = self.items[i]
         mel = torch.from_numpy(np.array(self.mels[e["offset"]: e["offset"] + e["frames"]], dtype=np.float32))
         item = {
-            "text": torch.tensor(text_to_ids(e["norm_text"], normalized=True), dtype=torch.long),
+            "text": torch.tensor(text_to_ids(e["norm_text"], normalized=True, language=self.language), dtype=torch.long),
             "mel": self.stats.normalize(mel.T.contiguous()),
             "spk": e["spk_id"],
             "index": i,
