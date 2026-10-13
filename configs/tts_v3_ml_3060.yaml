@@ -1,0 +1,14 @@
+# RTX 3060 Laptop GPU (12 GB) recipe measured on Rasa Malayalam.
+# Batch 8 with the upstream 16 generated/unconditional samples ran out of VRAM.
+# A 200-step full-dataset gate passed at roughly 1.36 steps/s with 8 of each.
+base: tts_v3_ml.yaml
+
+drift:
+  gen_per_cond: 8
+  uncond_per_cond: 8
+
+train:
+  batch_size: 8
+  batch_frames: 12000
+  num_workers: 2
+  compile: false
