@@ -362,7 +362,8 @@ def retry_oom(fn, *args, tries: int = 30, wait: float = 30.0, **kw):
             time.sleep(wait)
 
 
-def judge(judges, wav: torch.Tensor, text: str, band: int, spk_ref: torch.Tensor | None):
+def judge(judges, wav: torch.Tensor, text: str, band: int, spk_ref: torch.Tensor | None,
+          language: str = "tr"):
     """CER / WER counts, UTMOSv2 and speaker similarity of one utterance; returns the row and its embedding."""
     from .benchmark import band_match
     from .evaluate import _plain
@@ -370,8 +371,8 @@ def judge(judges, wav: torch.Tensor, text: str, band: int, spk_ref: torch.Tensor
 
     row: dict = {}
     if judges.asr is not None:
-        ref = _plain(text)
-        row["hyp"] = _plain(judges.asr(band_match(wav, band)))
+        ref = _plain(text, language=language)
+        row["hyp"] = _plain(judges.asr(band_match(wav, band)), language=language)
         row.update(error_counts(ref, row["hyp"]))
     full = band_match(wav, 0)
     emb = judges.sv(full) if judges.sv is not None else None
@@ -445,8 +446,8 @@ def load_utterances(args, synth, speaker: int) -> list[Utterance]:
         items = load_texts(args.texts)[args.offset: args.offset + args.num]
         out = []
         for k, item in enumerate(items):
-            text = normalize(item["text"])
-            ids = torch.tensor([text_to_ids(text, normalized=True)], device=dev)
+            text = normalize(item["text"], language=synth.language)
+            ids = torch.tensor([text_to_ids(text, normalized=True, language=synth.language)], device=dev)
             u = Utterance(args.offset + k, text, ids)
             u.targets = token_targets(synth.model, ids, torch.tensor([speaker], device=dev))
             out.append(u)
@@ -491,7 +492,8 @@ def run(args) -> None:
     runner = Runner(synth, speaker, args.temperature, args.cfg, release)
     utts = load_utterances(args, synth, speaker)
     band = (8000 if args.texts else 0) if args.band is None else args.band
-    judges = retry_oom(load_judges, args.asr, args.sv if not args.texts else None, args.mos, args.device)
+    judges = retry_oom(load_judges, args.asr, args.sv if not args.texts else None, args.mos, args.device,
+                       language=synth.language)
     pool = ProcessPoolExecutor(args.workers, mp_context=get_context("spawn"), initializer=_init_worker)
     with_rec = not args.texts
     if with_rec and systems[0].name != "recording":  # the reference for the paired metrics and similarity
@@ -537,7 +539,7 @@ def run(args) -> None:
                                        sv=None if s.name == "recording" or "speaker_sim" in r else judges.sv)
                         wav = torch.from_numpy(sf.read(wav_path(s, u), dtype="float32")[0])
                         r.update(retry_oom(judge, need, u.audio if s.name == "recording" else wav, u.text, band,
-                                           spk_ref.get(u.index))[0])
+                                           spk_ref.get(u.index), synth.language)[0])
                     cached.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
                     print(f"{s.name}: judges added", flush=True)
                 results[s.name] = {"system": s.name, **aggregate(rows)}
@@ -556,7 +558,7 @@ def run(args) -> None:
             ref = wav_path(parse_system("recording"), u) if with_rec else None
             futs.append(pool.submit(_features, str(path), u.text, args.f0, None if ref is None else str(ref),
                                     rec_f0.get(u.index), runner.alignment(u, s)))
-            row, emb = retry_oom(judge, judges, wav, u.text, band, spk_ref.get(u.index))
+            row, emb = retry_oom(judge, judges, wav, u.text, band, spk_ref.get(u.index), synth.language)
             if s.name == "recording":
                 spk_ref[u.index] = emb
             row.update(index=u.index, text=u.text, seconds=wav.numel() / SAMPLE_RATE, **runner.token_report(u, s))

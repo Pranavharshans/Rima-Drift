@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import time
 from pathlib import Path
 
@@ -504,6 +505,21 @@ def run(args) -> None:
         torch.cuda.set_per_process_memory_fraction(min(1.0, float(tc.max_gpu_gb) / total))
     tts = load_frozen_tts(cfg.tts, device)
     cache = torch.load(cfg.cache, map_location="cpu", weights_only=False)
+    expected_language = cfg.get("expected_language")
+    if expected_language or cfg.get("expected_speakers") is not None:
+        from .train import load_tts
+
+        _, tts_cfg, stats = load_tts(cfg.tts, device)
+        if tts_cfg.model.get("language", "tr") != expected_language or stats.get("backend") != "bigvgan":
+            raise ValueError("prosody acoustic checkpoint must be Malayalam with bigvgan mels")
+        speakers = json.loads((Path(tts_cfg.data.root) / "speakers.json").read_text())
+        if speakers != dict(cfg.expected_speakers) or tts.encoder.spk.num_embeddings != len(speakers):
+            raise ValueError(f"prosody acoustic speaker map mismatch: {speakers}")
+        if Path(cache.get("model", "")).resolve() != Path(cfg.tts).resolve():
+            raise ValueError("prosody cache was built from a different acoustic checkpoint")
+        splits = {u["split"] for u in cache["utts"]}
+        if not {"train", "dev"} <= splits or "val" in splits:
+            raise ValueError(f"Malayalam prosody cache must contain train and dev only: {splits}")
     cal = cfg.get("calibrate", {})
     if args.calibrate_only:
         path = work / "prosody_ema.pt"
@@ -511,6 +527,7 @@ def run(args) -> None:
         ck = torch.load(path, map_location="cpu", weights_only=False)
         dt, rhythm = cal.get("duration_temperature"), {int(k): int(v) for k, v in (cal.get("rhythm") or {}).items()}
         ck["duration_scales"] = calibrate(pred, tts, cache, device, cal.get("temperature", 1.0),
+                                          speakers=sorted(cfg.expected_speakers.values()) if cfg.get("expected_speakers") else (722, 389, 323),
                                           spread=cal.get("spread", 1.0), duration_temperature=dt, rhythm=rhythm)
         ck["calibrate_temperature"], ck["calibrate_spread"] = cal.get("temperature", 1.0), cal.get("spread", 1.0)
         ck["temperature"] = cal.get("temperature", 1.0)  # the default of Synthesizer(prosody_temperature=None)
@@ -618,9 +635,12 @@ def run(args) -> None:
         if step % tc.save_every == 0 or step == tc.steps:
             save(work / "last.pt", True)
             save(work / "prosody_ema.pt", False)
+            if tc.get("keep_snapshots", False):
+                shutil.copyfile(work / "prosody_ema.pt", work / f"prosody_ema_{step}.pt")
     if cal.get("enabled", True):
         pred.net = ema.model
         pred.duration_scales = calibrate(pred, tts, cache, device, cal.get("temperature", 1.0),
+                                         speakers=sorted(cfg.expected_speakers.values()) if cfg.get("expected_speakers") else (722, 389, 323),
                                          spread=cal.get("spread", 1.0))
         save(work / "prosody_ema.pt", False)
     print(f"done: {work / 'prosody_ema.pt'}", flush=True)

@@ -1,0 +1,18 @@
+# Separate Malayalam v3.2 stochastic duration/pitch predictor.
+# Override tts with the selected stage-3 acoustic checkpoint on the remote GPU.
+base: prosody_drift.yaml
+
+tts: runs/tts_v3_ml/model_ema.pt
+cache: runs/prosody_ml_cache/targets.pt
+expected_language: ml
+expected_speakers:
+  malayalam_female: 0
+  malayalam_male: 1
+
+eval_split: dev
+train:
+  keep_snapshots: true
+
+calibrate:
+  enabled: true
+  temperature: 1.0

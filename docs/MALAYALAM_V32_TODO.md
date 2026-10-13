@@ -85,14 +85,14 @@ the later implementation stages.
       duration calibration and per-voice checkpoint selection.
 - [x] **4 — Vocos first-run code:** 40k-step config, pretrained source, two-voice development copy-synthesis checks.
 - [x] **5 — Vocos continuation code:** 160k additional steps, source checkpoint and snapshot selection checks.
-- [ ] **6 — Prosody code:** frozen-acoustic target cache, pilot/full-run config, temperature
+- [x] **6 — Prosody code:** frozen-acoustic target cache, pilot/full-run config, temperature
       calibration and deterministic fallback checks.
 - [ ] **7 — Integration code:** Malayalam checkpoint loading, two-voice synthesis, held-out
       inference/listening protocol, provenance and release artifact checks.
 - [ ] **Implementation gate:** review and push the complete remote runbook and all code;
       record the final implementation commit ___ before any GPU job is submitted.
 
-Implementation stages 0–5 are code-complete and pushed. Their gated-data behavior and
+Implementation stages 0–6 are code-complete and pushed. Their gated-data behavior and
 Malayalam speech quality are **unverified** until remote execution. Number-bearing and
 unsupported transcripts are rejected for review; a Malayalam number verbalizer can be
 added after the remote rejection audit shows which forms are actually present.
@@ -242,6 +242,42 @@ WER, and refuses a missing recording reference. Listen to the saved audio and th
 TensorBoard `real`/`recorded_mel`/`gta` triplets, especially buzz, pitch and
 consonants. Select by review, record the selected export hash and the source
 `last.pt` hash, and retain all snapshot files. Never select on Rasa `val`.
+
+### Stage 6 remote runbook (do not run until the implementation gate)
+
+Cache MAS duration and token-pitch targets from the **selected** acoustic checkpoint,
+using train and dev only. The Malayalam prosody config rejects a cache built from a
+different acoustic path, a cache containing `val`, a non-Malayalam acoustic model,
+or a speaker-map mismatch. It calibrates both voice IDs from training rows. Keep
+the pilot and full runs separate; full EMA snapshots are retained every 2k steps.
+
+```bash
+ACOUSTIC_CKPT=runs/tts_v3_ml/model_ema_SELECTED_STEP.pt
+VOCODER_CKPT=runs/vocos_v2_ml/vocos_ft_SELECTED_STEP.pt
+drifting-tts prosody-cache --model "$ACOUSTIC_CKPT" \
+  --data data/malayalam --splits train dev --out runs/prosody_ml_cache/targets.pt
+drifting-tts train-prosody --config configs/prosody_drift_ml.yaml \
+  --workdir runs/prosody_ml_pilot "tts=$ACOUSTIC_CKPT" \
+  train.steps=200 train.warmup=20 train.eval_every=100 train.save_every=100
+drifting-tts train-prosody --config configs/prosody_drift_ml.yaml \
+  --workdir runs/prosody_ml "tts=$ACOUSTIC_CKPT"
+
+for voice in female male; do
+  drifting-tts prosody --model "$ACOUSTIC_CKPT" --vocoder "$VOCODER_CKPT" \
+    --release-prosody runs/prosody_ml/prosody_ema.pt \
+    --systems recording copy predicted release --split dev --speaker "$voice" \
+    --num 100 --diversity 4 --diversity-systems release \
+    --out "runs/prosody_ml/eval_dev_${voice}"
+done
+```
+
+Inspect pilot loss, `dev_history.json`, sampled rhythm and pitch, ASR, voice
+identity and both voices' listening samples. The prosody evaluation routes
+Malayalam text and ASR language correctly. Try candidate temperatures and
+`--release-prosody-durations regressor` on the **dev** split if sampled duration
+hurts either voice. Use deterministic prosody (`--prosody none` at synthesis)
+as the fallback if sampling degrades either voice. Record the selected prosody
+checkpoint hash and the cache/acoustic hashes. Do not tune on `val`.
 
 ## Remote execution pass: only after the implementation gate
 
