@@ -42,6 +42,9 @@ The [upstream training guide](docs/TRAINING.md) reports approximately 1.5 hours 
 acoustic model, and 1 hour for a BigVGAN fine-tune on one RTX 5090. A v3.2-style release adds Vocos and prosody
 training. Malayalam timings and quality must be measured on the chosen GPU. The GPU machine has not been selected.
 
+The actionable stages, estimated code changes and training times are tracked in the
+[Malayalam v3.2 training TODO](docs/MALAYALAM_V32_TODO.md). Complete and push each stage separately.
+
 ## Upstream reference: drifting-tts (Turkish)
 
 The documentation below describes the original Turkish releases and remains here as a reference while the Malayalam
