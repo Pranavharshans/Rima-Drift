@@ -108,8 +108,11 @@ def _iter_rows(files: list[str], trim: bool, limit: int, f0: bool = False, save_
                 row["f0_method"], row["backend"] = f0_method, backend
                 row["save_audio"] = save_audio
                 row["language"] = language
-                if preserve_splits and row["source_split"] not in ("train", "dev", "val"):
-                    raise ValueError(f"{f}: invalid source_split {row['source_split']!r}")
+                if preserve_splits:
+                    if row["source_split"] == "test":  # canonical Rasa retains the source name for its held-out set
+                        row["source_split"] = "val"
+                    elif row["source_split"] not in ("train", "dev", "val"):
+                        raise ValueError(f"{f}: invalid source_split {row['source_split']!r}")
                 yield row
                 n += 1
                 if limit and n >= limit:
