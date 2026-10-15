@@ -1,14 +1,15 @@
 # Rima-Drift: Malayalam TTS training project
 
-Rima-Drift is a planned Malayalam adaptation of
+Rima-Drift is a Malayalam adaptation of
 [kadirnar/drifting-tts](https://github.com/kadirnar/drifting-tts). The target is a full-weight text-to-speech model
 trained on the **Malayalam** subset of [ai4bharat/Rasa](https://huggingface.co/datasets/ai4bharat/Rasa), with separate
 female and male voices.
 
-**Status: implementation complete; remote execution pending.** The Malayalam Rasa ingestion,
-text frontend, Mel-MAE, acoustic, two-stage Vocos, prosody and release-check code is in place.
-No Malayalam model has been trained, evaluated, or released from this repository. The
-upstream examples below generate Turkish speech; they are not Malayalam demos.
+**Status: remote Malayalam training in progress.** Data preparation, Mel-MAE, acoustic TTS
+and the initial Vocos run are complete. The Vocos continuation is running; prosody training
+and final held-out validation remain. See the [Malayalam training results and status](docs/MALAYALAM_V32_RESULTS.md)
+for measured results, listening observations and evaluation limits. No Malayalam model has
+been released. The upstream examples below generate Turkish speech; they are not Malayalam demos.
 
 ## Malayalam training requirements
 
@@ -41,7 +42,8 @@ upstream examples below generate Turkish speech; they are not Malayalam demos.
 
 The [upstream training guide](docs/TRAINING.md) reports approximately 1.5 hours for Mel-MAE, 13.6 hours for the
 acoustic model, and 1 hour for a BigVGAN fine-tune on one RTX 5090. A v3.2-style release adds Vocos and prosody
-training. Malayalam timings and quality must be measured on the chosen GPU. The GPU machine has not been selected.
+training. The current Malayalam runs use a remote RTX 3060 Laptop GPU with 12 GB VRAM;
+measured timings and quality observations are recorded in the [results](docs/MALAYALAM_V32_RESULTS.md).
 
 The actionable stages, estimated code changes and training times are tracked in the
 [Malayalam v3.2 training TODO](docs/MALAYALAM_V32_TODO.md). Complete and push each stage separately.
