@@ -81,3 +81,51 @@ evaluation and human listening on both voices are still required.
 The active continuation log is `/workspace/vocos_v2_ml_full.log`; its output
 directory is `/workspace/Rima-Drift/runs/vocos_v2_ml/`. The status above is a
 snapshot, not a live counter.
+
+## Update: 16 October 2026
+
+The Vocos continuation was stopped after approximately 117k steps because a
+paired listening set of five new dev utterances per voice showed little audible
+difference between 30k and 115k on most clips. The 110k and 115k exported
+checkpoints and full 115k state were preserved. The 110k snapshot is a candidate,
+not a final quality selection. The small pronunciation error heard only in a GTA
+clip is more likely upstream of Vocos; that attribution still needs evaluation.
+
+Prosody targets were cached from the selected 150k acoustic model for 19,635
+training and 1,456 dev utterances. A 200-step prosody pilot completed and saved a
+checkpoint. The full 20k-step prosody run was started; its status must be read
+from `/workspace/prosody_ml_full.log`.
+
+### CPU generation speed before prosody
+
+The current acoustic checkpoint plus `runs/vocos_v2_ml/vocos_ft_110000.pt` was
+benchmarked on the remote Intel Xeon E5-2697A v4 CPU with a 15.36-CPU container
+quota. The process used four PyTorch threads at low priority while prosody GPU
+training was active. Five warm runs per voice and condition were measured on
+Malayalam dev text: short (23 characters), long (88) and a three-sentence item
+(125). Values below are medians. These are **pre-prosody** timings, not final
+release benchmarks.
+
+| Input and path | Female TTFA / end-to-end | Male TTFA / end-to-end | Female / male RTF |
+|---|---:|---:|---:|
+| Short, stream vocoder | 111 / 313 ms | 107 / 273 ms | 0.177 / 0.165 |
+| Long, whole utterance | 364 / 364 ms | 347 / 347 ms | 0.065 / 0.064 |
+| Long, stream vocoder | 307 / 419 ms | 263 / 373 ms | 0.075 / 0.069 |
+| Long, stream acoustic and vocoder | 157 / 572 ms | 152 / 545 ms | 0.102 / 0.101 |
+| Three sentences, stream separately | 183 / 744 ms | 212 / 780 ms | 0.085 / 0.094 |
+| Three sentences, group as paragraph and stream | 376 / 560 ms | 357 / 531 ms | 0.064 / 0.066 |
+
+TTFA is time from the text call to the first returned 24 kHz PCM audio; the
+streamed first piece was approximately 0.34–0.41 seconds of audio. End-to-end
+time ends when all PCM has been returned. RTF is end-to-end time divided by
+audio duration, so less than 1 is faster than real time. The measured minimum
+playback buffer was positive in every streamed condition (roughly 0.11–0.28 s),
+meaning no modeled playback stall for these requests. Model load took 2.26 s
+separately. Network transport, encoding and playback are excluded. Raw timings
+and example WAVs remain on the VM at
+`runs/cpu_benchmark_preprosody/`.
+
+The first benchmark attempt found that chunked acoustic streaming passed
+Malayalam text through the Turkish frontend. Commit `b67dd74` fixed the
+language argument; a focused remote Malayalam chunked-streaming check and the
+full CPU benchmark then passed.
