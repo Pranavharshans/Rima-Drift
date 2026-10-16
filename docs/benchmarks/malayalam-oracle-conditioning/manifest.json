@@ -1,0 +1,81 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "data": "data/malayalam",
+    "out": "runs/oracle_conditioning_ml",
+    "source_ids": [
+      "MAL_F_SAD_00441",
+      "MAL_M_WIKI_00133"
+    ],
+    "seed": 42
+  },
+  "note": "Reference durations are checkpoint MAS alignments, not hand-labelled phonemes. Both reference conditions use dev recordings; they are diagnostic oracle inputs, not deployable TTS inputs.",
+  "items": [
+    {
+      "source_id": "MAL_F_SAD_00441",
+      "speaker": "malayalam_female",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "reference_mel_frames": 759,
+      "predicted_mel_frames": 676,
+      "files": {
+        "recording": {
+          "file": "female_recording.wav",
+          "seconds": 8.105
+        },
+        "predicted_duration_predicted_pitch": {
+          "file": "female_predicted_duration_predicted_pitch.wav",
+          "seconds": 7.211,
+          "mel_frames": 676
+        },
+        "reference_duration_predicted_pitch": {
+          "file": "female_reference_duration_predicted_pitch.wav",
+          "seconds": 8.096,
+          "mel_frames": 759
+        },
+        "predicted_duration_reference_pitch": {
+          "file": "female_predicted_duration_reference_pitch.wav",
+          "seconds": 7.211,
+          "mel_frames": 676
+        },
+        "reference_duration_reference_pitch": {
+          "file": "female_reference_duration_reference_pitch.wav",
+          "seconds": 8.096,
+          "mel_frames": 759
+        }
+      }
+    },
+    {
+      "source_id": "MAL_M_WIKI_00133",
+      "speaker": "malayalam_male",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "reference_mel_frames": 687,
+      "predicted_mel_frames": 661,
+      "files": {
+        "recording": {
+          "file": "male_recording.wav",
+          "seconds": 7.336
+        },
+        "predicted_duration_predicted_pitch": {
+          "file": "male_predicted_duration_predicted_pitch.wav",
+          "seconds": 7.051,
+          "mel_frames": 661
+        },
+        "reference_duration_predicted_pitch": {
+          "file": "male_reference_duration_predicted_pitch.wav",
+          "seconds": 7.328,
+          "mel_frames": 687
+        },
+        "predicted_duration_reference_pitch": {
+          "file": "male_predicted_duration_reference_pitch.wav",
+          "seconds": 7.051,
+          "mel_frames": 661
+        },
+        "reference_duration_reference_pitch": {
+          "file": "male_reference_duration_reference_pitch.wav",
+          "seconds": 7.328,
+          "mel_frames": 687
+        }
+      }
+    }
+  ]
+}
