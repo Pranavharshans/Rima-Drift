@@ -129,3 +129,40 @@ The first benchmark attempt found that chunked acoustic streaming passed
 Malayalam text through the Turkish frontend. Commit `b67dd74` fixed the
 language argument; a focused remote Malayalam chunked-streaming check and the
 full CPU benchmark then passed.
+
+### Prosody completion and GPU generation speed
+
+The 20k-step ProsodyNet run completed with exit code 0 and exported
+`runs/prosody_ml/prosody_ema.pt`. At `T=1`, held-out dev metrics changed from
+2k to 20k as follows: pitch jitter ratio 1.513 to 0.977 (recordings = 1),
+pitch standard-deviation ratio 0.763 to 0.865, duration standard-deviation
+ratio 0.929 to 1.024, pitch CRPS 0.267 to 0.248, duration CRPS 0.318 to
+0.299, pitch distribution distance 0.097 to 0.058, and duration distribution
+distance 0.077 to 0.017. Pitch correlation changed from 0.428 to 0.406:
+distribution matching improved, but the model did not improve its correlation
+with the particular recorded pitch contour. At `T=0.7`, final pitch correlation
+was 0.444 and pitch jitter ratio 0.877. Training loss near 20k was 2.545,
+with main loss 1.220; the composite loss alone is not a quality measure.
+
+On the now-idle RTX 3060 Laptop GPU (12 GB), the same dev prompts and five
+warm repetitions per condition were run with the 150k acoustic and 110k Vocos
+checkpoints, first without prosody and then with the 20k prosody checkpoint.
+All values below are medians in milliseconds for the female/male voices.
+
+| Input and path | GPU without prosody TTFA / end-to-end | GPU with prosody TTFA / end-to-end | With prosody RTF, female / male |
+|---|---:|---:|---:|
+| Short, stream vocoder | 47 / 97; 46 / 97 | 73 / 154; 74 / 154 | 0.068 / 0.067 |
+| Long, whole utterance | 49 / 49; 50 / 50 | 79 / 79; 80 / 80 | 0.013 / 0.015 |
+| Long, stream vocoder | 46 / 54; 47 / 54 | 74 / 90; 73 / 85 | 0.015 / 0.016 |
+| Long, stream acoustic and vocoder | 49 / 119; 46 / 110 | 76 / 158; 73 / 147 | 0.026 / 0.028 |
+| Three sentences, stream separately | 47 / 152; 47 / 155 | 73 / 237; 76 / 240 | 0.027 / 0.027 |
+| Three sentences, group as paragraph and stream | 47 / 61; 46 / 57 | 73 / 92; 78 / 95 | 0.011 / 0.011 |
+
+Here each semicolon separates female and male results. TTFA and end-to-end
+use the same definitions as the CPU benchmark above. Model loading (2.65 s
+without prosody, 2.83 s with it), network, encoding and playback are excluded.
+This is single-request throughput on one GPU, with no concurrency or serving
+stack. Raw timings and example WAVs remain on the VM at
+`runs/gpu_benchmark_preprosody/` and `runs/gpu_benchmark_prosody20k/`.
+These latency measurements do not establish audible prosody quality; paired
+listening and held-out intelligibility checks are still needed.
