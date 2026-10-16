@@ -1,0 +1,73 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "data": "data/malayalam",
+    "out": "runs/slurring_diagnostic_ml",
+    "original_manifest": "runs/unbatched_listening_ml/manifest.json",
+    "source_ids": [
+      "MAL_F_SAD_00441",
+      "MAL_M_WIKI_00133"
+    ]
+  },
+  "note": "same text and seed; unbatched FP32 inference; recorded mel is the dataset mel fed through this Vocos checkpoint",
+  "items": [
+    {
+      "source_id": "MAL_F_SAD_00441",
+      "speaker": "female",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "files": {
+        "recording": {
+          "file": "female_recording.wav",
+          "seconds": 8.105
+        },
+        "recorded_mel_vocos": {
+          "file": "female_recorded_mel_vocos.wav",
+          "seconds": 8.096
+        },
+        "sampled": {
+          "file": "female_sampled.wav",
+          "seconds": 8.245
+        },
+        "regressor": {
+          "file": "female_regressor.wav",
+          "seconds": 7.52
+        },
+        "none": {
+          "file": "female_none.wav",
+          "seconds": 7.52
+        }
+      }
+    },
+    {
+      "source_id": "MAL_M_WIKI_00133",
+      "speaker": "male",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "files": {
+        "recording": {
+          "file": "male_recording.wav",
+          "seconds": 7.336
+        },
+        "recorded_mel_vocos": {
+          "file": "male_recorded_mel_vocos.wav",
+          "seconds": 7.328
+        },
+        "sampled": {
+          "file": "male_sampled.wav",
+          "seconds": 7.68
+        },
+        "regressor": {
+          "file": "male_regressor.wav",
+          "seconds": 7.275
+        },
+        "none": {
+          "file": "male_none.wav",
+          "seconds": 7.275
+        }
+      }
+    }
+  ]
+}
