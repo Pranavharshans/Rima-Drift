@@ -1,0 +1,101 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "index": "data/malayalam/index.jsonl",
+    "out": "runs/unbatched_listening_ml",
+    "clips": 5,
+    "min_seconds": 4.0
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "path": "Synthesizer.__call__, one request at a time, FP32, no CUDA graphs or compile",
+  "clips": [
+    {
+      "number": 1,
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "voices": {
+        "female": {
+          "file": "01_female.wav",
+          "seconds": 8.245,
+          "rtf_total": 0.0812
+        },
+        "male": {
+          "file": "01_male.wav",
+          "seconds": 6.677,
+          "rtf_total": 0.0116
+        }
+      }
+    },
+    {
+      "number": 2,
+      "text": "തീർച്ചയായും. ബ്രിട്ടീഷ് ഇന്ത്യ രാജ്യത്തുടനീളം ധാരാളം പള്ളികളുടെ നിർമ്മാണത്തിന് സാക്ഷ്യം വഹിച്ചു.",
+      "seed": 1001,
+      "voices": {
+        "female": {
+          "file": "02_female.wav",
+          "seconds": 6.422,
+          "rtf_total": 0.0318
+        },
+        "male": {
+          "file": "02_male.wav",
+          "seconds": 5.643,
+          "rtf_total": 0.0273
+        }
+      }
+    },
+    {
+      "number": 3,
+      "text": "ദക്ഷിണ ഒഡീഷയിൽ, ഒരു മാസം നീണ്ടുനിൽക്കുന്ന ദണ്ഡ നട നൃത്തോത്സവത്തിന്റെ അവസാനമായാണ് മേരു യാത്രാ ഉത്സവം ആഘോഷിക്കുന്നത്.",
+      "seed": 1002,
+      "voices": {
+        "female": {
+          "file": "03_female.wav",
+          "seconds": 8.971,
+          "rtf_total": 0.0129
+        },
+        "male": {
+          "file": "03_male.wav",
+          "seconds": 7.659,
+          "rtf_total": 0.01
+        }
+      }
+    },
+    {
+      "number": 4,
+      "text": "ശുചിത്വം ഉറപ്പുവരുത്തുന്നതിന്, എല്ലാ വിദ്യാർത്ഥിനികളും കോയിൻ എടുക്കൽ ഞങ്ങൾ നിർബന്ധമാക്കിയിട്ടുണ്ട്.",
+      "seed": 1003,
+      "voices": {
+        "female": {
+          "file": "04_female.wav",
+          "seconds": 5.717,
+          "rtf_total": 0.0174
+        },
+        "male": {
+          "file": "04_male.wav",
+          "seconds": 5.237,
+          "rtf_total": 0.0144
+        }
+      }
+    },
+    {
+      "number": 5,
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "voices": {
+        "female": {
+          "file": "05_female.wav",
+          "seconds": 8.875,
+          "rtf_total": 0.0114
+        },
+        "male": {
+          "file": "05_male.wav",
+          "seconds": 7.68,
+          "rtf_total": 0.01
+        }
+      }
+    }
+  ],
+  "rejected_short": 0
+}
