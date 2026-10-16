@@ -1,0 +1,89 @@
+{
+  "config": {
+    "models": [
+      "70000:runs/tts_v3_ml/model_ema_70000.pt",
+      "150000:runs/tts_v3_ml/model_ema_150000.pt"
+    ],
+    "vocos": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "data": "data/malayalam",
+    "training_samples": "runs/tts_v3_ml/samples",
+    "indices": [
+      1,
+      2
+    ],
+    "out": "runs/training_replay_ml"
+  },
+  "note": "exact log_samples text, speaker, seed=i, CFG=2, temperature=0.5, direct model.synthesize; same mel sent to both vocoders",
+  "items": [
+    {
+      "index": 1,
+      "source_id": "MAL_F_ANGER_00545",
+      "speaker": "malayalam_female",
+      "text": "രണ്ട് സ്റ്റാർ ഹോട്ടലുകൾക്ക് ഇത്രേം പൈസ വാങ്ങിയോണ്ട് ഞാനിനി ഒരിക്കലും ഈ ഓപ്പറേറ്ററുമായി ഹോളിഡേ ബുക്ക് ചെയ്യണ പ്രശ്നല്ല.",
+      "files": {
+        "recording": "utt1_recording.wav",
+        "70000": {
+          "bigvgan_replay": {
+            "file": "utt1_step70000_bigvgan_replay.wav",
+            "seconds": 7.563
+          },
+          "vocos_replay": {
+            "file": "utt1_step70000_vocos_replay.wav",
+            "seconds": 7.563
+          },
+          "saved_training": {
+            "file": "utt1_step70000_saved_training.wav"
+          }
+        },
+        "150000": {
+          "bigvgan_replay": {
+            "file": "utt1_step150000_bigvgan_replay.wav",
+            "seconds": 7.349
+          },
+          "vocos_replay": {
+            "file": "utt1_step150000_vocos_replay.wav",
+            "seconds": 7.349
+          },
+          "saved_training": {
+            "file": "utt1_step150000_saved_training.wav"
+          }
+        }
+      }
+    },
+    {
+      "index": 2,
+      "source_id": "MAL_F_SURPRISE_00074",
+      "speaker": "malayalam_female",
+      "text": "ഒരു ക്രെഡിറ്റ് കാർഡെടുത്ത് എത്ര പെട്ടെന്നാണ് ഈ ആളുകൾ കടത്തിൽ മുങ്ങുന്നത്.",
+      "files": {
+        "recording": "utt2_recording.wav",
+        "70000": {
+          "bigvgan_replay": {
+            "file": "utt2_step70000_bigvgan_replay.wav",
+            "seconds": 4.533
+          },
+          "vocos_replay": {
+            "file": "utt2_step70000_vocos_replay.wav",
+            "seconds": 4.533
+          },
+          "saved_training": {
+            "file": "utt2_step70000_saved_training.wav"
+          }
+        },
+        "150000": {
+          "bigvgan_replay": {
+            "file": "utt2_step150000_bigvgan_replay.wav",
+            "seconds": 4.501
+          },
+          "vocos_replay": {
+            "file": "utt2_step150000_vocos_replay.wav",
+            "seconds": 4.501
+          },
+          "saved_training": {
+            "file": "utt2_step150000_saved_training.wav"
+          }
+        }
+      }
+    }
+  ]
+}
