@@ -451,7 +451,7 @@ class Synthesizer:
         """:meth:`_mel` without the DiT, for :mod:`drifting_tts.chunked`: the noise scaled by ``temperature``
         ``[1, n_mels, T]``, the aligned condition ``[1, C, T]``, the CFG scale ``[1]`` and the style codes, with the
         same draws from ``g`` (CUDA graphs for the encoder when ``fast`` allows it)."""
-        ids, ctx = self.with_context(sentence, previous)
+        ids, ctx = self.with_context(sentence, previous, language=self.language)
         ids = torch.tensor([ids], device=self.device)
         pt = self.prosody_temperature if prosody_temperature is None else prosody_temperature
         dt = self.prosody_duration_temperature if self.prosody_durations == "sampled" else None
