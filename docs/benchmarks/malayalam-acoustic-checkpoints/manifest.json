@@ -1,0 +1,88 @@
+{
+  "config": {
+    "models": [
+      "30000:runs/tts_v3_ml/model_ema_30000.pt",
+      "70000:runs/tts_v3_ml/model_ema_70000.pt",
+      "110000:runs/tts_v3_ml/model_ema_110000.pt",
+      "150000:runs/tts_v3_ml/model_ema_150000.pt"
+    ],
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "diagnostic_manifest": "runs/slurring_diagnostic_ml/manifest.json",
+    "out": "runs/acoustic_checkpoint_compare_ml"
+  },
+  "note": "unbatched FP32, no prosody, same Vocos/text/voice/seed/cfg/temperature",
+  "items": [
+    {
+      "step": 30000,
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "file": "female_30000.wav",
+      "seconds": 7.243
+    },
+    {
+      "step": 30000,
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "file": "male_30000.wav",
+      "seconds": 6.912
+    },
+    {
+      "step": 70000,
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "file": "female_70000.wav",
+      "seconds": 7.477
+    },
+    {
+      "step": 70000,
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "file": "male_70000.wav",
+      "seconds": 7.168
+    },
+    {
+      "step": 110000,
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "file": "female_110000.wav",
+      "seconds": 7.392
+    },
+    {
+      "step": 110000,
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "file": "male_110000.wav",
+      "seconds": 6.997
+    },
+    {
+      "step": 150000,
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "file": "female_150000.wav",
+      "seconds": 7.52
+    },
+    {
+      "step": 150000,
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "file": "male_150000.wav",
+      "seconds": 7.275
+    }
+  ]
+}
