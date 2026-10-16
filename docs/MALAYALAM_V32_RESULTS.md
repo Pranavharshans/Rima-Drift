@@ -165,3 +165,22 @@ listening and held-out intelligibility checks are still needed.
 
 For simultaneous-request latency, playback stalls and the 12 GB GPU's
 memory limit, see [Malayalam GPU concurrency](MALAYALAM_CONCURRENCY.md).
+
+### Quality follow-up: slurred acoustic synthesis
+
+In a later same-sentence listening check, the user found the original recording
+and its reconstruction through the selected 110k Vocos checkpoint clear, while
+unbatched FP32 synthesis was slightly slurred both with and without sampled
+prosody. See the [matched A/B clips](benchmarks/malayalam-slurring-diagnostic/README.md).
+On those sentences, this localizes the quality problem upstream of Vocos and rules out
+`Serving.fast()`, FP16, batching, and sampled prosody as necessary causes.
+
+With prosody disabled and Vocos fixed, [30k, 70k, 110k, and 150k acoustic
+checkpoints](benchmarks/malayalam-acoustic-checkpoints/README.md) sounded
+approximately alike to the user and none was satisfactory. This is informal
+listening on two sentences, not a dev-set conclusion. A bounded
+[guidance/temperature comparison](benchmarks/malayalam-inference-settings/README.md)
+is available for listening. The two tested `norm_text` strings were unchanged
+by a second Malayalam normalization pass; that check does not validate the
+character-level tokenization or acoustic alignment. Prioritize acoustic text,
+alignment, and data-quality diagnosis before another vocoder or prosody run.

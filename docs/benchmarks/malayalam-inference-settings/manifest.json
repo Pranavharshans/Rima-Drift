@@ -1,0 +1,91 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "diagnostic_manifest": "runs/slurring_diagnostic_ml/manifest.json",
+    "out": "runs/inference_settings_ml"
+  },
+  "note": "unbatched FP32; acoustic/Vocos/text/voice/seed fixed; no prosody",
+  "items": [
+    {
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "cfg_scale": 1.0,
+      "temperature": 0.3,
+      "file": "female_cfg1_temp0.3.wav",
+      "seconds": 7.52
+    },
+    {
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "cfg_scale": 2.0,
+      "temperature": 0.3,
+      "file": "female_cfg2_temp0.3.wav",
+      "seconds": 7.52
+    },
+    {
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "cfg_scale": 3.0,
+      "temperature": 0.3,
+      "file": "female_cfg3_temp0.3.wav",
+      "seconds": 7.52
+    },
+    {
+      "speaker": "female",
+      "source_id": "MAL_F_SAD_00441",
+      "text": "രേഖകള്‍ വേദനാജനകമായ ഒരു സത്യം വെളിപ്പെടുത്തിയപ്പോൾ മുറിയാകെ നിശബ്ദമായി, പ്രതീക്ഷകളുടെ തിളക്കം കെടുത്തി.",
+      "seed": 1000,
+      "cfg_scale": 2.0,
+      "temperature": 0.5,
+      "file": "female_cfg2_temp0.5.wav",
+      "seconds": 7.52
+    },
+    {
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "cfg_scale": 1.0,
+      "temperature": 0.3,
+      "file": "male_cfg1_temp0.3.wav",
+      "seconds": 7.275
+    },
+    {
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "cfg_scale": 2.0,
+      "temperature": 0.3,
+      "file": "male_cfg2_temp0.3.wav",
+      "seconds": 7.275
+    },
+    {
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "cfg_scale": 3.0,
+      "temperature": 0.3,
+      "file": "male_cfg3_temp0.3.wav",
+      "seconds": 7.275
+    },
+    {
+      "speaker": "male",
+      "source_id": "MAL_M_WIKI_00133",
+      "text": "രാഗത്തിൻ്റെ ഭംഗി വിശദീകരിക്കാൻ രചനയുടെ ഈണത്തിലും അതുപോലെ സ്വരങ്ങൾ ഉപയോഗിക്കുന്നതിലും തത്ക്ഷണ രചനാപാടവം സംഭവിക്കുന്നു.",
+      "seed": 1004,
+      "cfg_scale": 2.0,
+      "temperature": 0.5,
+      "file": "male_cfg2_temp0.5.wav",
+      "seconds": 7.275
+    }
+  ]
+}
