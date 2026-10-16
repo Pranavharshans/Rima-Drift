@@ -87,9 +87,12 @@ def main():
     p.add_argument("--requests", type=int, nargs="+", default=[1, 8, 16, 32, 64, 100, 128, 200, 256, 384])
     p.add_argument("--repeats", type=int, default=2)
     p.add_argument("--paragraph-every", type=int, default=4)
+    p.add_argument("--fast-serving", action="store_true", help="use Serving.fast() for the batched path")
     args = p.parse_args()
     if any(n < 1 for n in args.requests) or args.repeats < 1:
         p.error("requests and repeats must be positive")
+    if args.fast_serving and args.strategy == "fifo":
+        p.error("--fast-serving applies to batched and microbatch strategies only")
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     texts = dev_texts(Path(args.index), max(args.requests), args.paragraph_every)
@@ -100,7 +103,8 @@ def main():
     model_load = time.perf_counter() - start
     kw = {"seeds": list(range(len(texts))),
           "stream": {"speaker": args.speaker, "cfg_scale": 2.0, "temperature": 0.3,
-                     "pause": 0.15, "chunked": None}, "serving": Serving()}
+                     "pause": 0.15, "chunked": None},
+          "serving": Serving.fast() if args.fast_serving else Serving()}
     result = {"config": vars(args), "gpu": torch.cuda.get_device_name(0),
               "gpu_total_gib": round(torch.cuda.mem_get_info()[1] / 2**30, 3),
               "model_load_s": round(model_load, 3), "timing": "simultaneous arrival to CPU PCM",

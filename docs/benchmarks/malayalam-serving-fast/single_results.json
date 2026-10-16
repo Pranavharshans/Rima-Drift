@@ -1,0 +1,109 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "original_results": "runs/gpu_benchmark_prosody20k/results.json",
+    "out": "runs/fast_compare_ml/single",
+    "repeats": 5
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "results": {
+    "female_short_fp32": {
+      "warmup_s": 0.729,
+      "ttfa_ms": 60.21,
+      "e2e_ms": 125.26,
+      "audio_s": 2.187,
+      "rtf": 0.0573,
+      "peak": 0.6983
+    },
+    "female_short_fast": {
+      "warmup_s": 132.562,
+      "ttfa_ms": 36.67,
+      "e2e_ms": 79.24,
+      "audio_s": 2.187,
+      "rtf": 0.0362,
+      "peak": 0.69
+    },
+    "female_long_fp32": {
+      "warmup_s": 0.096,
+      "ttfa_ms": 57.94,
+      "e2e_ms": 67.24,
+      "audio_s": 5.141,
+      "rtf": 0.0131,
+      "peak": 0.5267
+    },
+    "female_long_fast": {
+      "warmup_s": 0.729,
+      "ttfa_ms": 36.41,
+      "e2e_ms": 47.25,
+      "audio_s": 5.141,
+      "rtf": 0.0092,
+      "peak": 0.5316
+    },
+    "female_paragraph_fp32": {
+      "warmup_s": 0.271,
+      "ttfa_ms": 57.87,
+      "e2e_ms": 191.91,
+      "audio_s": 8.631,
+      "rtf": 0.0222,
+      "peak": 0.6518
+    },
+    "female_paragraph_fast": {
+      "warmup_s": 1.035,
+      "ttfa_ms": 36.96,
+      "e2e_ms": 130.98,
+      "audio_s": 8.631,
+      "rtf": 0.0152,
+      "peak": 0.6531
+    },
+    "male_short_fp32": {
+      "warmup_s": 0.126,
+      "ttfa_ms": 57.51,
+      "e2e_ms": 121.16,
+      "audio_s": 2.241,
+      "rtf": 0.0541,
+      "peak": 0.5191
+    },
+    "male_short_fast": {
+      "warmup_s": 0.724,
+      "ttfa_ms": 36.19,
+      "e2e_ms": 77.69,
+      "audio_s": 2.241,
+      "rtf": 0.0347,
+      "peak": 0.5183
+    },
+    "male_long_fp32": {
+      "warmup_s": 0.082,
+      "ttfa_ms": 57.07,
+      "e2e_ms": 66.53,
+      "audio_s": 5.088,
+      "rtf": 0.0131,
+      "peak": 0.548
+    },
+    "male_long_fast": {
+      "warmup_s": 0.323,
+      "ttfa_ms": 38.97,
+      "e2e_ms": 49.86,
+      "audio_s": 5.088,
+      "rtf": 0.0098,
+      "peak": 0.548
+    },
+    "male_paragraph_fp32": {
+      "warmup_s": 0.198,
+      "ttfa_ms": 58.2,
+      "e2e_ms": 195.9,
+      "audio_s": 8.695,
+      "rtf": 0.0225,
+      "peak": 0.5873
+    },
+    "male_paragraph_fast": {
+      "warmup_s": 0.782,
+      "ttfa_ms": 36.99,
+      "e2e_ms": 132.82,
+      "audio_s": 8.695,
+      "rtf": 0.0153,
+      "peak": 0.5894
+    }
+  }
+}

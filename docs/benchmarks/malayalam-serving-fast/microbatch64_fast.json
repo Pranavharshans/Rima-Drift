@@ -1,0 +1,87 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "index": "data/malayalam/index.jsonl",
+    "out": "runs/fast_compare_ml/microbatch64_fast.json",
+    "speaker": "female",
+    "strategy": "microbatch",
+    "micro_batch": 64,
+    "requests": [
+      100,
+      200
+    ],
+    "repeats": 2,
+    "paragraph_every": 4,
+    "fast_serving": true
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "gpu_total_gib": 11.631,
+  "model_load_s": 2.612,
+  "timing": "simultaneous arrival to CPU PCM",
+  "transport": "excluded",
+  "results": {
+    "100": {
+      "requests": 100,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 340.95,
+        "p90": 1106.59,
+        "p99": 1106.59,
+        "max": 1106.59
+      },
+      "e2e_ms": {
+        "p50": 809.79,
+        "p90": 1392.06,
+        "p99": 1518.2,
+        "max": 1518.2
+      },
+      "request_rtf": {
+        "p50": 0.11,
+        "p90": 0.5,
+        "p99": 1.28,
+        "max": 1.36
+      },
+      "all_done_ms": 1508.67,
+      "total_audio_s": 815.75,
+      "audio_seconds_per_second": 540.73,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.905,
+      "gpu_peak_reserved_gib": 1.383,
+      "process_peak_ram_gib": 2.486
+    },
+    "200": {
+      "requests": 200,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 1293.66,
+        "p90": 2209.43,
+        "p99": 2948.55,
+        "max": 2948.55
+      },
+      "e2e_ms": {
+        "p50": 1487.49,
+        "p90": 2636.14,
+        "p99": 3112.35,
+        "max": 3195.09
+      },
+      "request_rtf": {
+        "p50": 0.22,
+        "p90": 0.75,
+        "p99": 2.28,
+        "max": 3.7
+      },
+      "all_done_ms": 3187.76,
+      "total_audio_s": 1675.16,
+      "audio_seconds_per_second": 525.5,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.004,
+      "gpu_peak_reserved_gib": 1.621,
+      "process_peak_ram_gib": 2.659
+    }
+  },
+  "stop": null
+}
