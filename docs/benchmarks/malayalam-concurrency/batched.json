@@ -1,0 +1,340 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "index": "data/malayalam/index.jsonl",
+    "out": "runs/concurrency_ml/batched.json",
+    "speaker": "female",
+    "strategy": "batched",
+    "micro_batch": 32,
+    "requests": [
+      1,
+      8,
+      16,
+      32,
+      64,
+      100,
+      128,
+      200,
+      256,
+      384,
+      512,
+      768
+    ],
+    "repeats": 2,
+    "paragraph_every": 4
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "gpu_total_gib": 11.631,
+  "model_load_s": 2.634,
+  "timing": "simultaneous arrival to CPU PCM",
+  "transport": "excluded",
+  "results": {
+    "1": {
+      "requests": 1,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 61.27,
+        "p90": 61.39,
+        "p99": 61.42,
+        "max": 61.42
+      },
+      "e2e_ms": {
+        "p50": 72.53,
+        "p90": 73.36,
+        "p99": 73.55,
+        "max": 73.57
+      },
+      "request_rtf": {
+        "p50": 0.02,
+        "p90": 0.02,
+        "p99": 0.02,
+        "max": 0.02
+      },
+      "all_done_ms": 72.53,
+      "total_audio_s": 4.31,
+      "audio_seconds_per_second": 59.43,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.354,
+      "gpu_peak_reserved_gib": 0.371,
+      "process_peak_ram_gib": 1.429
+    },
+    "8": {
+      "requests": 8,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 85.49,
+        "p90": 87.81,
+        "p99": 87.81,
+        "max": 87.81
+      },
+      "e2e_ms": {
+        "p50": 179.97,
+        "p90": 362.42,
+        "p99": 402.94,
+        "max": 403.91
+      },
+      "request_rtf": {
+        "p50": 0.04,
+        "p90": 0.05,
+        "p99": 0.06,
+        "max": 0.06
+      },
+      "all_done_ms": 400.68,
+      "total_audio_s": 63.37,
+      "audio_seconds_per_second": 158.18,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.409,
+      "gpu_peak_reserved_gib": 0.453,
+      "process_peak_ram_gib": 1.461
+    },
+    "16": {
+      "requests": 16,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 195.28,
+        "p90": 198.51,
+        "p99": 198.51,
+        "max": 198.51
+      },
+      "e2e_ms": {
+        "p50": 388.14,
+        "p90": 718.46,
+        "p99": 798.41,
+        "max": 800.86
+      },
+      "request_rtf": {
+        "p50": 0.06,
+        "p90": 0.13,
+        "p99": 0.35,
+        "max": 0.35
+      },
+      "all_done_ms": 796.91,
+      "total_audio_s": 127.98,
+      "audio_seconds_per_second": 160.6,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.514,
+      "gpu_peak_reserved_gib": 0.625,
+      "process_peak_ram_gib": 1.521
+    },
+    "32": {
+      "requests": 32,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 516.91,
+        "p90": 517.73,
+        "p99": 517.73,
+        "max": 517.73
+      },
+      "e2e_ms": {
+        "p50": 845.87,
+        "p90": 1412.43,
+        "p99": 1489.96,
+        "max": 1494.78
+      },
+      "request_rtf": {
+        "p50": 0.15,
+        "p90": 0.47,
+        "p99": 0.91,
+        "max": 0.92
+      },
+      "all_done_ms": 1475.01,
+      "total_audio_s": 262.18,
+      "audio_seconds_per_second": 177.78,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.803,
+      "gpu_peak_reserved_gib": 1.197,
+      "process_peak_ram_gib": 1.534
+    },
+    "64": {
+      "requests": 64,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 1040.78,
+        "p90": 1041.21,
+        "p99": 1041.21,
+        "max": 1041.21
+      },
+      "e2e_ms": {
+        "p50": 1605.82,
+        "p90": 2382.78,
+        "p99": 2469.87,
+        "max": 2474.85
+      },
+      "request_rtf": {
+        "p50": 0.26,
+        "p90": 0.79,
+        "p99": 1.76,
+        "max": 1.84
+      },
+      "all_done_ms": 2459.5,
+      "total_audio_s": 502.38,
+      "audio_seconds_per_second": 204.27,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.258,
+      "gpu_peak_reserved_gib": 2.121,
+      "process_peak_ram_gib": 1.561
+    },
+    "100": {
+      "requests": 100,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 1856.11,
+        "p90": 1862.3,
+        "p99": 1862.3,
+        "max": 1862.3
+      },
+      "e2e_ms": {
+        "p50": 2715.53,
+        "p90": 3936.23,
+        "p99": 3958.67,
+        "max": 3963.82
+      },
+      "request_rtf": {
+        "p50": 0.44,
+        "p90": 1.48,
+        "p99": 2.65,
+        "max": 3.29
+      },
+      "all_done_ms": 3959.55,
+      "total_audio_s": 815.72,
+      "audio_seconds_per_second": 206.01,
+      "playback_stalled_share": 0.01,
+      "playback_stall_p99_ms": 0.56,
+      "gpu_peak_allocated_gib": 2.008,
+      "gpu_peak_reserved_gib": 3.791,
+      "process_peak_ram_gib": 1.578
+    },
+    "128": {
+      "requests": 128,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 2367.5,
+        "p90": 2372.73,
+        "p99": 2372.73,
+        "max": 2372.73
+      },
+      "e2e_ms": {
+        "p50": 3424.23,
+        "p90": 4903.89,
+        "p99": 4945.74,
+        "max": 4955.78
+      },
+      "request_rtf": {
+        "p50": 0.58,
+        "p90": 1.66,
+        "p99": 3.35,
+        "max": 4.2
+      },
+      "all_done_ms": 4944.45,
+      "total_audio_s": 1024.26,
+      "audio_seconds_per_second": 207.15,
+      "playback_stalled_share": 0.016,
+      "playback_stall_p99_ms": 16.94,
+      "gpu_peak_allocated_gib": 2.473,
+      "gpu_peak_reserved_gib": 5.178,
+      "process_peak_ram_gib": 1.596
+    },
+    "200": {
+      "requests": 200,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 3685.31,
+        "p90": 3688.58,
+        "p99": 3688.58,
+        "max": 3688.58
+      },
+      "e2e_ms": {
+        "p50": 5576.62,
+        "p90": 7857.26,
+        "p99": 8133.77,
+        "max": 8253.47
+      },
+      "request_rtf": {
+        "p50": 0.87,
+        "p90": 2.31,
+        "p99": 5.21,
+        "max": 6.52
+      },
+      "all_done_ms": 8222.6,
+      "total_audio_s": 1675.07,
+      "audio_seconds_per_second": 203.72,
+      "playback_stalled_share": 0.99,
+      "playback_stall_p99_ms": 556.4,
+      "gpu_peak_allocated_gib": 3.671,
+      "gpu_peak_reserved_gib": 7.6,
+      "process_peak_ram_gib": 1.654
+    },
+    "256": {
+      "requests": 256,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 4712.57,
+        "p90": 4719.75,
+        "p99": 4719.75,
+        "max": 4719.75
+      },
+      "e2e_ms": {
+        "p50": 7097.64,
+        "p90": 9954.46,
+        "p99": 10522.06,
+        "max": 10762.94
+      },
+      "request_rtf": {
+        "p50": 1.11,
+        "p90": 3.02,
+        "p99": 6.63,
+        "max": 8.35
+      },
+      "all_done_ms": 10535.0,
+      "total_audio_s": 2123.38,
+      "audio_seconds_per_second": 201.65,
+      "playback_stalled_share": 0.992,
+      "playback_stall_p99_ms": 1022.02,
+      "gpu_peak_allocated_gib": 4.601,
+      "gpu_peak_reserved_gib": 10.367,
+      "process_peak_ram_gib": 1.728
+    },
+    "384": {
+      "requests": 384,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 7065.02,
+        "p90": 7074.34,
+        "p99": 7074.34,
+        "max": 7074.34
+      },
+      "e2e_ms": {
+        "p50": 10511.76,
+        "p90": 14617.57,
+        "p99": 15094.13,
+        "max": 15204.76
+      },
+      "request_rtf": {
+        "p50": 1.59,
+        "p90": 4.35,
+        "p99": 9.67,
+        "max": 12.51
+      },
+      "all_done_ms": 15196.23,
+      "total_audio_s": 3267.43,
+      "audio_seconds_per_second": 215.02,
+      "playback_stalled_share": 0.995,
+      "playback_stall_p99_ms": 2155.28,
+      "gpu_peak_allocated_gib": 6.731,
+      "gpu_peak_reserved_gib": 9.404,
+      "process_peak_ram_gib": 1.816
+    }
+  },
+  "stop": {
+    "requests": 512,
+    "reason": "CUDA out of memory",
+    "detail": "CUDA out of memory. Tried to allocate 1.78 GiB. GPU 0 has a total capacity of 11.63 GiB of which 585.62 MiB is free. Process 1437603 has 11.05 GiB memory in use. Of the allocated memory 7.08 GiB is allocated by PyTorch, and 3.82 GiB is reserved by PyTorch but unallocated. If reserved but unallocated"
+  }
+}

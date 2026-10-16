@@ -1,0 +1,148 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "index": "data/malayalam/index.jsonl",
+    "out": "runs/concurrency_ml/fifo.json",
+    "speaker": "female",
+    "strategy": "fifo",
+    "micro_batch": 32,
+    "requests": [
+      1,
+      32,
+      100,
+      200
+    ],
+    "repeats": 2,
+    "paragraph_every": 4
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "gpu_total_gib": 11.631,
+  "model_load_s": 3.775,
+  "timing": "simultaneous arrival to CPU PCM",
+  "transport": "excluded",
+  "results": {
+    "1": {
+      "requests": 1,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 125.64,
+        "p90": 126.4,
+        "p99": 126.57,
+        "max": 126.58
+      },
+      "e2e_ms": {
+        "p50": 137.34,
+        "p90": 138.28,
+        "p99": 138.49,
+        "max": 138.52
+      },
+      "request_rtf": {
+        "p50": 0.03,
+        "p90": 0.03,
+        "p99": 0.03,
+        "max": 0.03
+      },
+      "all_done_ms": 137.34,
+      "total_audio_s": 4.31,
+      "audio_seconds_per_second": 31.38,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.354,
+      "gpu_peak_reserved_gib": 0.371,
+      "process_peak_ram_gib": 1.41
+    },
+    "32": {
+      "requests": 32,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 2497.44,
+        "p90": 4397.4,
+        "p99": 4654.44,
+        "max": 4673.18
+      },
+      "e2e_ms": {
+        "p50": 2621.03,
+        "p90": 4405.36,
+        "p99": 4850.3,
+        "max": 4859.83
+      },
+      "request_rtf": {
+        "p50": 0.23,
+        "p90": 2.83,
+        "p99": 3.95,
+        "max": 3.98
+      },
+      "all_done_ms": 4852.26,
+      "total_audio_s": 262.19,
+      "audio_seconds_per_second": 54.04,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.363,
+      "gpu_peak_reserved_gib": 0.375,
+      "process_peak_ram_gib": 1.442
+    },
+    "100": {
+      "requests": 100,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 6860.38,
+        "p90": 12460.47,
+        "p99": 13660.59,
+        "max": 13731.18
+      },
+      "e2e_ms": {
+        "p50": 6871.59,
+        "p90": 12533.45,
+        "p99": 13666.49,
+        "max": 13957.26
+      },
+      "request_rtf": {
+        "p50": 0.96,
+        "p90": 4.88,
+        "p99": 14.42,
+        "max": 15.43
+      },
+      "all_done_ms": 13954.03,
+      "total_audio_s": 815.75,
+      "audio_seconds_per_second": 58.46,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.363,
+      "gpu_peak_reserved_gib": 0.395,
+      "process_peak_ram_gib": 1.465
+    },
+    "200": {
+      "requests": 200,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 14117.87,
+        "p90": 26471.45,
+        "p99": 29826.46,
+        "max": 30289.78
+      },
+      "e2e_ms": {
+        "p50": 14161.88,
+        "p90": 26537.26,
+        "p99": 29992.46,
+        "max": 30604.06
+      },
+      "request_rtf": {
+        "p50": 2.13,
+        "p90": 7.96,
+        "p99": 27.03,
+        "max": 46.22
+      },
+      "all_done_ms": 29897.78,
+      "total_audio_s": 1675.1,
+      "audio_seconds_per_second": 56.06,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 0.363,
+      "gpu_peak_reserved_gib": 0.396,
+      "process_peak_ram_gib": 1.483
+    }
+  },
+  "stop": null
+}

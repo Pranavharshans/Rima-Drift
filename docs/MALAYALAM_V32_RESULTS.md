@@ -1,9 +1,10 @@
 # Malayalam v3.2 training results and status
 
-Status recorded **15 October 2026**. This is a running experiment on a remote
-NVIDIA RTX 3060 Laptop GPU (12 GB). Rasa data, checkpoints, logs and WAV files
-remain on that machine; they are not stored in Git. The code revision used for
-the current runs is `417735f`.
+Status updated **16 October 2026**. Training stages finished on a remote
+NVIDIA RTX 3060 Laptop GPU (12 GB); final quality validation remains. Rasa
+data, checkpoints, logs and WAV files remain on that machine; they are not
+stored in Git. The original training runs used revision `417735f`; later
+inference benchmarking includes the Malayalam streaming fix in `b67dd74`.
 
 ## Data and completed components
 
@@ -13,8 +14,8 @@ the current runs is `417735f`.
 | Mel-MAE | Completed 60,000 steps | Final `runs/mae2d_ml/mae_ema.pt`; final reported reconstruction loss about 0.042. |
 | Acoustic TTS | Completed 150,000 steps in 30.92 hours | The final calibrated EMA checkpoint was selected for subsequent stages: `runs/tts_v3_ml/model_ema_150000.pt`. SHA-256: `2bfa4a59057e9564ab723ab6e047fa5c81c1c061ef44d2b12f58667db4488d76`. |
 | Initial Vocos | Completed 40,000 steps | `runs/vocos_ml/last.pt` (full continuation state; SHA-256 `4bdf157e988c49ee13928130b179e6b81df03d95f97e61a213ce94f174355b73`); exported generator `runs/vocos_ml/vocos_ft_40000.pt`. |
-| Vocos continuation | **Running**, step 54,600 of 160,000 additional steps at the last status check | Started from the full step-40,000 Vocos state, including generator, discriminators and optimizer state. Latest checked speed was about 1.14 steps/s with 11.1 GB GPU memory. Its step counter starts at zero; step 54,600 means 94,600 cumulative Vocos steps. |
-| Stochastic prosody | Not started | Planned 20,000-step run after selecting the Vocos checkpoint. |
+| Vocos continuation | Stopped after approximately 117,000 additional steps | Started from the full step-40,000 Vocos state; 110k and 115k exported checkpoints and full 115k state preserved. The 110k export was used for prosody and latency experiments. |
+| Stochastic prosody | Completed 20,000 steps | `runs/prosody_ml/prosody_ema.pt`; dev metrics and GPU latency below. |
 | Final held-out validation and release packaging | Not started | Required before any quality or release claim. |
 
 The acoustic run ended with reported loss 2.946, `centroid_mse` 0.07187,
@@ -66,21 +67,16 @@ explicit Malayalam language setting. Those CER/WER numbers cannot rank model
 checkpoints or establish intelligibility. A working Malayalam transcription
 evaluation and human listening on both voices are still required.
 
-1. Keep the Vocos continuation running while matching-utterance listening
-   shows gains. Compare both voices at later saved checkpoints, especially
-   sample 0's jitter and sample 1's retained clarity. Choose the checkpoint
-   on dev listening and valid evaluation, not training loss alone.
-2. Freeze the selected acoustic and Vocos checkpoints; cache Malayalam
-   duration/pitch targets, run the 200-step prosody pilot, then train the
-   planned 20k-step prosody model. Compare sampled prosody with deterministic
-   timing and pitch; keep the deterministic path if prosody harms either voice.
+1. Compare sampled prosody with deterministic timing and pitch for both voices;
+   keep the deterministic path if prosody harms either voice.
+2. Confirm the 110k Vocos selection with final matched-utterance listening and
+   a valid Malayalam intelligibility evaluation.
 3. Run final two-voice listening and held-out checks on the exact assembled
    model. Record dataset revision, checkpoint hashes and validated metrics
    before calling the Malayalam model released.
 
-The active continuation log is `/workspace/vocos_v2_ml_full.log`; its output
-directory is `/workspace/Rima-Drift/runs/vocos_v2_ml/`. The status above is a
-snapshot, not a live counter.
+The Vocos continuation log is `/workspace/vocos_v2_ml_full.log`; its output
+directory is `/workspace/Rima-Drift/runs/vocos_v2_ml/`.
 
 ## Update: 16 October 2026
 
@@ -93,8 +89,8 @@ clip is more likely upstream of Vocos; that attribution still needs evaluation.
 
 Prosody targets were cached from the selected 150k acoustic model for 19,635
 training and 1,456 dev utterances. A 200-step prosody pilot completed and saved a
-checkpoint. The full 20k-step prosody run was started; its status must be read
-from `/workspace/prosody_ml_full.log`.
+checkpoint. The full 20k-step prosody run subsequently completed; its final
+metrics are below, and its log is `/workspace/prosody_ml_full.log`.
 
 ### CPU generation speed before prosody
 
@@ -166,3 +162,6 @@ stack. Raw timings and example WAVs remain on the VM at
 `runs/gpu_benchmark_preprosody/` and `runs/gpu_benchmark_prosody20k/`.
 These latency measurements do not establish audible prosody quality; paired
 listening and held-out intelligibility checks are still needed.
+
+For simultaneous-request latency, playback stalls and the 12 GB GPU's
+memory limit, see [Malayalam GPU concurrency](MALAYALAM_CONCURRENCY.md).

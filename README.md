@@ -5,11 +5,12 @@ Rima-Drift is a Malayalam adaptation of
 trained on the **Malayalam** subset of [ai4bharat/Rasa](https://huggingface.co/datasets/ai4bharat/Rasa), with separate
 female and male voices.
 
-**Status: remote Malayalam training in progress.** Data preparation, Mel-MAE, acoustic TTS
-and the initial Vocos run are complete. The Vocos continuation is running; prosody training
-and final held-out validation remain. See the [Malayalam training results and status](docs/MALAYALAM_V32_RESULTS.md)
-for measured results, listening observations and evaluation limits. No Malayalam model has
-been released. The upstream examples below generate Turkish speech; they are not Malayalam demos.
+**Status: Malayalam training stages complete; final validation remains.** Data preparation,
+Mel-MAE, acoustic TTS, Vocos continuation and 20k-step prosody training have completed on
+the remote GPU. See the [Malayalam training results](docs/MALAYALAM_V32_RESULTS.md) and
+[GPU concurrency measurements](docs/MALAYALAM_CONCURRENCY.md). Final held-out and listening
+validation remain before any Malayalam release. The upstream examples below generate
+Turkish speech; they are not Malayalam demos.
 
 ## Malayalam training requirements
 

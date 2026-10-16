@@ -1,0 +1,86 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "index": "data/malayalam/index.jsonl",
+    "out": "runs/concurrency_ml/male_batched.json",
+    "speaker": "male",
+    "strategy": "batched",
+    "micro_batch": 32,
+    "requests": [
+      100,
+      200
+    ],
+    "repeats": 2,
+    "paragraph_every": 4
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "gpu_total_gib": 11.631,
+  "model_load_s": 2.537,
+  "timing": "simultaneous arrival to CPU PCM",
+  "transport": "excluded",
+  "results": {
+    "100": {
+      "requests": 100,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 1638.9,
+        "p90": 1648.06,
+        "p99": 1648.06,
+        "max": 1648.06
+      },
+      "e2e_ms": {
+        "p50": 2425.78,
+        "p90": 3462.68,
+        "p99": 3618.32,
+        "max": 3618.32
+      },
+      "request_rtf": {
+        "p50": 0.44,
+        "p90": 1.28,
+        "p99": 2.64,
+        "max": 3.15
+      },
+      "all_done_ms": 3596.84,
+      "total_audio_s": 749.22,
+      "audio_seconds_per_second": 208.31,
+      "playback_stalled_share": 0.01,
+      "playback_stall_p99_ms": 1.2,
+      "gpu_peak_allocated_gib": 1.785,
+      "gpu_peak_reserved_gib": 2.832,
+      "process_peak_ram_gib": 1.506
+    },
+    "200": {
+      "requests": 200,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 3230.24,
+        "p90": 3230.54,
+        "p99": 3230.54,
+        "max": 3230.54
+      },
+      "e2e_ms": {
+        "p50": 4874.55,
+        "p90": 6905.81,
+        "p99": 7248.43,
+        "max": 7320.77
+      },
+      "request_rtf": {
+        "p50": 0.82,
+        "p90": 1.79,
+        "p99": 5.09,
+        "max": 6.18
+      },
+      "all_done_ms": 7304.36,
+      "total_audio_s": 1533.76,
+      "audio_seconds_per_second": 209.98,
+      "playback_stalled_share": 0.985,
+      "playback_stall_p99_ms": 448.8,
+      "gpu_peak_allocated_gib": 3.223,
+      "gpu_peak_reserved_gib": 5.711,
+      "process_peak_ram_gib": 1.613
+    }
+  },
+  "stop": null
+}

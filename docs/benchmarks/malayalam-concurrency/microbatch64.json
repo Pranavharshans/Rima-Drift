@@ -1,0 +1,179 @@
+{
+  "config": {
+    "model": "runs/tts_v3_ml/model_ema_150000.pt",
+    "vocoder": "runs/vocos_v2_ml/vocos_ft_110000.pt",
+    "prosody": "runs/prosody_ml/prosody_ema.pt",
+    "index": "data/malayalam/index.jsonl",
+    "out": "runs/concurrency_ml/microbatch64.json",
+    "speaker": "female",
+    "strategy": "microbatch",
+    "micro_batch": 64,
+    "requests": [
+      64,
+      100,
+      200,
+      384,
+      512
+    ],
+    "repeats": 2,
+    "paragraph_every": 4
+  },
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "gpu_total_gib": 11.631,
+  "model_load_s": 2.582,
+  "timing": "simultaneous arrival to CPU PCM",
+  "transport": "excluded",
+  "results": {
+    "64": {
+      "requests": 64,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 1041.19,
+        "p90": 1042.9,
+        "p99": 1042.9,
+        "max": 1042.9
+      },
+      "e2e_ms": {
+        "p50": 1604.73,
+        "p90": 2345.44,
+        "p99": 2432.23,
+        "max": 2434.62
+      },
+      "request_rtf": {
+        "p50": 0.26,
+        "p90": 0.79,
+        "p99": 1.76,
+        "max": 1.84
+      },
+      "all_done_ms": 2433.89,
+      "total_audio_s": 502.38,
+      "audio_seconds_per_second": 206.41,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.258,
+      "gpu_peak_reserved_gib": 1.955,
+      "process_peak_ram_gib": 1.488
+    },
+    "100": {
+      "requests": 100,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 1045.47,
+        "p90": 3121.39,
+        "p99": 3121.39,
+        "max": 3121.39
+      },
+      "e2e_ms": {
+        "p50": 2267.49,
+        "p90": 3847.55,
+        "p99": 4095.56,
+        "max": 4095.56
+      },
+      "request_rtf": {
+        "p50": 0.33,
+        "p90": 1.45,
+        "p99": 3.61,
+        "max": 3.83
+      },
+      "all_done_ms": 4078.5,
+      "total_audio_s": 815.71,
+      "audio_seconds_per_second": 200.01,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.258,
+      "gpu_peak_reserved_gib": 1.955,
+      "process_peak_ram_gib": 1.501
+    },
+    "200": {
+      "requests": 200,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 3624.68,
+        "p90": 6374.54,
+        "p99": 8691.81,
+        "max": 8691.81
+      },
+      "e2e_ms": {
+        "p50": 4119.35,
+        "p90": 7538.71,
+        "p99": 8944.44,
+        "max": 9391.58
+      },
+      "request_rtf": {
+        "p50": 0.64,
+        "p90": 2.17,
+        "p99": 6.59,
+        "max": 10.67
+      },
+      "all_done_ms": 8892.27,
+      "total_audio_s": 1675.06,
+      "audio_seconds_per_second": 188.97,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.41,
+      "gpu_peak_reserved_gib": 2.652,
+      "process_peak_ram_gib": 1.513
+    },
+    "384": {
+      "requests": 384,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 7598.23,
+        "p90": 13751.8,
+        "p99": 13808.52,
+        "max": 13808.52
+      },
+      "e2e_ms": {
+        "p50": 8521.44,
+        "p90": 14374.53,
+        "p99": 15229.95,
+        "max": 15300.15
+      },
+      "request_rtf": {
+        "p50": 1.08,
+        "p90": 4.28,
+        "p99": 9.73,
+        "max": 11.43
+      },
+      "all_done_ms": 15272.22,
+      "total_audio_s": 3267.38,
+      "audio_seconds_per_second": 213.94,
+      "playback_stalled_share": 0.001,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.41,
+      "gpu_peak_reserved_gib": 2.652,
+      "process_peak_ram_gib": 1.525
+    },
+    "512": {
+      "requests": 512,
+      "repeats": 2,
+      "ttfa_ms": {
+        "p50": 10119.38,
+        "p90": 19059.3,
+        "p99": 19112.91,
+        "max": 19112.91
+      },
+      "e2e_ms": {
+        "p50": 10873.62,
+        "p90": 19302.17,
+        "p99": 20397.99,
+        "max": 20722.91
+      },
+      "request_rtf": {
+        "p50": 1.4,
+        "p90": 6.0,
+        "p99": 12.31,
+        "max": 22.97
+      },
+      "all_done_ms": 20699.14,
+      "total_audio_s": 4373.97,
+      "audio_seconds_per_second": 211.31,
+      "playback_stalled_share": 0.0,
+      "playback_stall_p99_ms": 0.0,
+      "gpu_peak_allocated_gib": 1.41,
+      "gpu_peak_reserved_gib": 2.652,
+      "process_peak_ram_gib": 1.532
+    }
+  },
+  "stop": null
+}
